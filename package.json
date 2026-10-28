@@ -1,0 +1,53 @@
+{
+  "name": "teachai-agent-web",
+  "version": "0.1.0",
+  "private": true,
+  "engines": {
+    "node": ">=16.16 <17"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@hookform/resolvers": "3.9.0",
+    "@tanstack/react-query": "4.36.1",
+    "class-variance-authority": "0.7.1",
+    "clsx": "2.1.1",
+    "lucide-react": "0.468.0",
+    "motion": "11.11.17",
+    "next": "13.5.11",
+    "react": "18.2.0",
+    "react-dom": "18.2.0",
+    "react-hook-form": "7.51.5",
+    "sonner": "1.7.0",
+    "tailwind-merge": "2.5.4",
+    "zod": "3.23.8",
+    "zustand": "4.5.5"
+  },
+  "devDependencies": {
+    "@testing-library/dom": "9.3.4",
+    "@testing-library/jest-dom": "6.4.8",
+    "@testing-library/react": "14.3.1",
+    "@testing-library/user-event": "14.5.2",
+    "@types/node": "18.19.64",
+    "@types/react": "18.2.79",
+    "@types/react-dom": "18.2.25",
+    "@vitejs/plugin-react": "4.2.1",
+    "autoprefixer": "10.4.20",
+    "eslint": "8.57.1",
+    "eslint-config-next": "13.5.11",
+    "jsdom": "22.1.0",
+    "postcss": "8.4.49",
+    "tailwindcss": "3.4.17",
+    "typescript": "5.4.5",
+    "vite": "4.5.5",
+    "vitest": "0.34.6"
+  }
+}
+

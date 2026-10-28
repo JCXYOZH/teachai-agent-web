@@ -1,0 +1,123 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply min-h-screen bg-paper font-sans text-ink antialiased;
+    background-image:
+      radial-gradient(circle at 8% -8%, rgba(217, 88, 61, 0.1), transparent 30%),
+      radial-gradient(circle at 88% 2%, rgba(169, 189, 168, 0.3), transparent 34%),
+      linear-gradient(180deg, #f4f0e5 0%, #efe9da 100%);
+  }
+
+  ::selection {
+    @apply bg-ember text-paper;
+  }
+
+  :focus-visible {
+    outline: 2px solid #d9583d;
+    outline-offset: 3px;
+  }
+
+  button,
+  a,
+  input {
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+@layer components {
+  .paper-card {
+    @apply border border-ink/10 bg-[rgba(255,252,245,0.68)] shadow-card backdrop-blur-[2px];
+  }
+
+  .eyebrow {
+    @apply font-mono text-[0.64rem] font-medium uppercase tracking-[0.22em] text-ink/50;
+  }
+
+  .rule-label {
+    @apply flex items-center gap-3 font-mono text-[0.64rem] uppercase tracking-[0.18em] text-ink/45;
+  }
+
+  .rule-label::after {
+    content: '';
+    @apply h-px flex-1 bg-ink/15;
+  }
+
+  .notebook-rule {
+    background-image: repeating-linear-gradient(
+      to bottom,
+      transparent 0,
+      transparent 31px,
+      rgba(19, 32, 28, 0.09) 31px,
+      rgba(19, 32, 28, 0.09) 32px
+    );
+  }
+
+  .stage-grid {
+    background-color: #091713;
+    background-image:
+      linear-gradient(rgba(237, 244, 233, 0.055) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(237, 244, 233, 0.055) 1px, transparent 1px),
+      radial-gradient(circle at 72% 24%, rgba(177, 214, 190, 0.2), transparent 24%),
+      radial-gradient(circle at 16% 86%, rgba(217, 88, 61, 0.16), transparent 26%);
+    background-size: 42px 42px, 42px 42px, auto, auto;
+  }
+
+  .margin-note {
+    @apply relative pl-5 text-sm leading-6 text-ink/60;
+  }
+
+  .margin-note::before {
+    content: '';
+    @apply absolute bottom-1 left-0 top-1 w-px bg-ember/60;
+  }
+
+  .nav-stitch {
+    background-image: repeating-linear-gradient(
+      to bottom,
+      rgba(237, 244, 233, 0.24) 0,
+      rgba(237, 244, 233, 0.24) 4px,
+      transparent 4px,
+      transparent 10px
+    );
+  }
+
+  .ambient-dot {
+    box-shadow: 0 0 0 7px rgba(169, 189, 168, 0.08), 0 0 36px rgba(169, 189, 168, 0.34);
+  }
+}
+
+@layer utilities {
+  .text-pretty {
+    text-wrap: pretty;
+  }
+
+  .safe-bottom {
+    padding-bottom: calc(0.7rem + env(safe-area-inset-bottom));
+  }
+
+  .fade-mask {
+    mask-image: linear-gradient(to bottom, transparent, black 12%, black 88%, transparent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}
