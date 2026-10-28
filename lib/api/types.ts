@@ -136,3 +136,49 @@ export interface SearchResponse {
   courses: SearchCourseHit[];
   assets: SearchAssetHit[];
 }
+
+export type ProviderProtocol = 'openai' | 'anthropic';
+export type ProviderApiKeySource = 'user' | 'environment';
+
+export interface ProviderConfig {
+  id: string;
+  label: string;
+  description: string;
+  protocol: ProviderProtocol;
+  default_base_url: string;
+  alternate_base_urls: string[];
+  requires_api_key: boolean;
+  supports_model_discovery: boolean;
+  default_models: string[];
+  configured: boolean;
+  api_key_configured: boolean;
+  api_key_hint: string | null;
+  api_key_source: ProviderApiKeySource | null;
+  base_url: string;
+  default_model: string;
+  is_default: boolean;
+  updated_at: string | null;
+}
+
+export interface ProviderConfigUpdate {
+  api_key?: string;
+  clear_api_key?: boolean;
+  base_url?: string | null;
+  default_model?: string | null;
+  is_default?: boolean;
+}
+
+export interface ProviderTestRequest {
+  api_key?: string;
+  base_url?: string;
+  default_model?: string;
+}
+
+export interface ProviderTestResponse {
+  provider_id: string;
+  success: boolean;
+  message: string;
+  latency_ms: number;
+  model: string;
+  models: string[];
+}

@@ -16,12 +16,11 @@ import { toast } from 'sonner';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { ProviderSettings } from '@/components/providers/provider-settings';
 import { logoutUser } from '@/lib/api/auth';
 import { API_BASE_URL, ApiError } from '@/lib/api/client';
 import { fetchHealth } from '@/lib/api/health';
 import { useAuthStore } from '@/lib/stores/auth-store';
-
-const providers = ['OpenAI', 'Anthropic', 'DeepSeek', 'Qwen', 'GLM', 'Kimi'];
 
 function initials(name: string): string {
   return Array.from(name.trim())[0]?.toUpperCase() ?? 'T';
@@ -171,23 +170,17 @@ export default function SettingsPage() {
             <p className='mt-1 text-[0.7rem] text-ink/35'>本地 llama.cpp · 32K context</p>
           </div>
           <div className='mt-4 flex items-center gap-2'>
-            <Badge tone='ember'>Phase 3</Badge>
-            <span className='text-[0.65rem] text-ink/35'>Provider 路由即将接入</span>
-          </div>
-          <div className='mt-6 border-t border-ink/10 pt-5'>
-            <p className='font-mono text-[0.5rem] uppercase tracking-[0.14em] text-ink/30'>Official providers</p>
-            <div className='mt-3 flex flex-wrap gap-2'>
-              {providers.map((provider) => (
-                <Badge key={provider}>{provider}</Badge>
-              ))}
-            </div>
+            <Badge tone='sage'>Live</Badge>
+            <span className='text-[0.65rem] text-ink/35'>Provider 配置在下方统一管理</span>
           </div>
         </div>
       </section>
 
+      <ProviderSettings />
+
       <div className='flex flex-col justify-between gap-2 border-t border-ink/10 pt-5 font-mono text-[0.5rem] uppercase tracking-[0.14em] text-ink/25 sm:flex-row sm:items-center'>
-        <span>TeachAIAgent / Phase 2</span>
-        <span>Auth · PostgreSQL · FastAPI</span>
+        <span>TeachAIAgent / Phase 3</span>
+        <span>Auth · Providers · PostgreSQL · FastAPI</span>
       </div>
     </div>
   );
