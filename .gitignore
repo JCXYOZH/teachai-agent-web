@@ -3,6 +3,7 @@ node_modules/
 out/
 coverage/
 .npm-cache/
+.idea/
 .env
 .env.local
 .env.*.local

@@ -35,11 +35,6 @@ export const metadata: Metadata = {
     template: '%s · TeachAI',
   },
   description: '把一节课，写成可以走进去的空间。',
-  themeColor: '#091713',
-  viewport: {
-    width: 'device-width',
-    initialScale: 1,
-  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -48,6 +43,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       lang='zh-CN'
       className={`${displayFont.variable} ${plexSans.variable} ${plexMono.variable}`}
     >
+      <head>
+        <meta name='theme-color' content='#091713' />
+        <meta name='viewport' content='width=device-width, initial-scale=1' />
+      </head>
       <body>
         <QueryProvider>
           <AuthProvider>{children}</AuthProvider>

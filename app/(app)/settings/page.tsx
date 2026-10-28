@@ -186,7 +186,7 @@ export default function SettingsPage() {
       </section>
 
       <div className='flex flex-col justify-between gap-2 border-t border-ink/10 pt-5 font-mono text-[0.5rem] uppercase tracking-[0.14em] text-ink/25 sm:flex-row sm:items-center'>
-        <span>TeachAIAgent / Phase 1</span>
+        <span>TeachAIAgent / Phase 2</span>
         <span>Auth · PostgreSQL · FastAPI</span>
       </div>
     </div>

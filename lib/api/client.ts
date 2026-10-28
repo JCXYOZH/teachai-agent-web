@@ -1,9 +1,11 @@
 import { useAuthStore } from '@/lib/stores/auth-store';
+import { resolveApiBaseUrl } from '@/lib/api/base-url';
 import type { ApiErrorBody } from '@/lib/api/types';
 
-export const API_BASE_URL = (
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8000/api/v1'
-).replace(/\/$/, '');
+export const API_BASE_URL = resolveApiBaseUrl(
+  process.env.NEXT_PUBLIC_API_BASE_URL,
+  typeof window === 'undefined' ? undefined : window.location.hostname,
+);
 
 const CSRF_COOKIE_NAME = 'teachai_csrf';
 const CSRF_HEADER_NAME = 'X-CSRF-Token';
@@ -122,10 +124,41 @@ export async function apiRequest<T>(
   path: string,
   options: RequestOptions = {},
 ): Promise<T> {
+  const response = await performRequest(path, options);
+
+  if (!response.ok) {
+    throw await parseError(response);
+  }
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
+  const contentType = response.headers.get('content-type') ?? '';
+  if (contentType.includes('application/json')) {
+    return (await response.json()) as T;
+  }
+  return (await response.text()) as T;
+}
+
+export async function apiDownload(
+  path: string,
+  options: RequestOptions = {},
+): Promise<Blob> {
+  const response = await performRequest(path, options);
+  if (!response.ok) {
+    throw await parseError(response);
+  }
+  return response.blob();
+}
+
+async function performRequest(
+  path: string,
+  options: RequestOptions = {},
+): Promise<Response> {
   const method = (options.method ?? 'GET').toUpperCase();
   const headers = buildHeaders(options, method);
-  let response: Response;
 
+  let response: Response;
   try {
     response = await fetch(`${API_BASE_URL}${path}`, {
       ...options,
@@ -142,20 +175,8 @@ export async function apiRequest<T>(
   if (response.status === 401 && options.auth !== false && options.retry !== false) {
     const refreshed = unauthorizedHandler ? await unauthorizedHandler() : false;
     if (refreshed) {
-      return apiRequest<T>(path, { ...options, retry: false });
+      return performRequest(path, { ...options, retry: false });
     }
   }
-
-  if (!response.ok) {
-    throw await parseError(response);
-  }
-  if (response.status === 204) {
-    return undefined as T;
-  }
-
-  const contentType = response.headers.get('content-type') ?? '';
-  if (contentType.includes('application/json')) {
-    return (await response.json()) as T;
-  }
-  return (await response.text()) as T;
+  return response;
 }

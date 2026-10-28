@@ -116,7 +116,7 @@ export function Sidebar() {
             </button>
           </div>
           <p className='mt-4 px-1 font-mono text-[0.44rem] uppercase tracking-[0.16em] text-chalk/20'>
-            TeachAI / Phase 1
+            TeachAI / Phase 2
           </p>
         </div>
       </div>
