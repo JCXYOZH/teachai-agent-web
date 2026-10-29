@@ -5,6 +5,7 @@ import {
 import type {
   AuthResponse,
   LoginPayload,
+  RegistrationCodeResponse,
   RegisterPayload,
 } from '@/lib/api/types';
 import { useAuthStore } from '@/lib/stores/auth-store';
@@ -22,7 +23,9 @@ export async function loginUser(payload: LoginPayload): Promise<AuthResponse> {
   return session;
 }
 
-export async function registerUser(payload: RegisterPayload): Promise<AuthResponse> {
+export async function registerUser(
+  payload: RegisterPayload,
+): Promise<AuthResponse> {
   const session = await apiRequest<AuthResponse>('/auth/register', {
     method: 'POST',
     body: payload,
@@ -31,6 +34,17 @@ export async function registerUser(payload: RegisterPayload): Promise<AuthRespon
   });
   useAuthStore.getState().setSession(session);
   return session;
+}
+
+export async function sendRegistrationCode(
+  email: string,
+): Promise<RegistrationCodeResponse> {
+  return apiRequest<RegistrationCodeResponse>('/auth/register/send-code', {
+    method: 'POST',
+    body: { email },
+    auth: false,
+    retry: false,
+  });
 }
 
 export async function refreshSession(): Promise<boolean> {

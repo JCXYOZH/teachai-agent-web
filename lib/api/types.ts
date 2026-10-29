@@ -19,6 +19,13 @@ export interface LoginPayload {
 
 export interface RegisterPayload extends LoginPayload {
   display_name?: string;
+  code: string;
+}
+
+export interface RegistrationCodeResponse {
+  email: string;
+  expires_in: number;
+  resend_after: number;
 }
 
 export interface HealthResponse {
