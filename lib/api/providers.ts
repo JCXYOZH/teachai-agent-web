@@ -17,6 +17,7 @@ export function updateProviderConfig(
   return apiRequest<ProviderConfig>(`/providers/${encodeURIComponent(providerId)}/config`, {
     method: 'PUT',
     body: payload,
+    keepalive: true,
   });
 }
 

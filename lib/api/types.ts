@@ -182,3 +182,160 @@ export interface ProviderTestResponse {
   model: string;
   models: string[];
 }
+
+export type ClassroomSceneType = 'slide' | 'quiz' | 'interactive' | 'pbl';
+
+export interface ClassroomSlideElement {
+  id: string;
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+  rotate?: number;
+  type: string;
+  content: string;
+  defaultFontName?: string;
+  defaultColor?: string;
+  textType?: string;
+  lineHeight?: number;
+}
+
+export interface ClassroomSlideCanvas {
+  id: string;
+  viewportSize: number;
+  viewportRatio: number;
+  theme?: {
+    backgroundColor?: string;
+    themeColors?: string[];
+    fontColor?: string;
+    fontName?: string;
+  };
+  background?: {
+    type: string;
+    color?: string;
+  };
+  elements: ClassroomSlideElement[];
+  turningMode?: string;
+  type?: string;
+  script?: string;
+}
+
+export interface ClassroomSlideContent {
+  type: 'slide';
+  schemaVersion?: number;
+  canvas: ClassroomSlideCanvas;
+}
+
+export interface ClassroomQuizOption {
+  label: string;
+  value: string;
+}
+
+export interface ClassroomQuestion {
+  id: string;
+  type: 'single' | 'multiple' | 'short_answer';
+  question: string;
+  options: ClassroomQuizOption[];
+  answer: string[];
+  analysis: string | null;
+  hasAnswer: boolean;
+  points: number;
+}
+
+export interface ClassroomQuizContent {
+  type: 'quiz';
+  questions: ClassroomQuestion[];
+}
+
+export interface ClassroomOtherContent {
+  type: 'interactive' | 'pbl';
+  [key: string]: unknown;
+}
+
+export type ClassroomSceneContent =
+  | ClassroomSlideContent
+  | ClassroomQuizContent
+  | ClassroomOtherContent;
+
+export interface ClassroomAction {
+  id: string;
+  type: string;
+  text?: string;
+  speed?: number;
+  [key: string]: unknown;
+}
+
+export interface ClassroomScene {
+  id: string;
+  stage_id: string;
+  type: ClassroomSceneType;
+  title: string;
+  order: number;
+  content: ClassroomSceneContent;
+  actions: ClassroomAction[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Classroom {
+  id: string;
+  course_id: string;
+  outline_id: string | null;
+  version: number;
+  name: string;
+  description: string;
+  style: string;
+  language_directive: string;
+  dsl_version: string;
+  provider_id: string | null;
+  model_name: string | null;
+  scene_count: number;
+  scenes: ClassroomScene[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ClassroomGeneratePayload {
+  provider_id?: string;
+  model?: string;
+  instructions?: string;
+}
+
+export type GenerationJobStatus = 'queued' | 'running' | 'completed' | 'failed';
+export type GenerationJobKind = 'outline' | 'classroom';
+
+export interface GenerationJob {
+  id: string;
+  course_id: string;
+  kind: GenerationJobKind;
+  outline_id: string | null;
+  stage_id: string | null;
+  provider_id: string | null;
+  model_name: string | null;
+  status: GenerationJobStatus;
+  progress: number;
+  message: string;
+  error_code: string | null;
+  error_message: string | null;
+  scene_count: number;
+  created_at: string;
+  started_at: string | null;
+  completed_at: string | null;
+}
+
+export interface CourseOutlineSummary {
+  id: string;
+  course_id: string;
+  version: number;
+  source: 'generated' | 'manual';
+  course_title: string;
+  scene_count: number;
+  created_at: string;
+}
+
+export interface CourseOutlineGeneratePayload {
+  provider_id?: string;
+  model?: string;
+  instructions?: string;
+  scene_count?: number;
+}

@@ -173,6 +173,33 @@ describe('ProviderSettings', () => {
     expect(screen.getByText('864 ms')).toBeInTheDocument();
   });
 
+  it('saves the newly selected provider after switching', async () => {
+    providerApi.updateProviderConfig.mockResolvedValue({
+      ...llama,
+      updated_at: '2026-10-28T04:00:00Z',
+    });
+    const user = userEvent.setup();
+    renderWithClient(<ProviderSettings />);
+
+    await user.click(
+      await screen.findByRole('button', { name: /Qwen \/ DashScope/ }),
+    );
+    await user.click(screen.getByRole('button', { name: /Local llama.cpp/ }));
+
+    expect(screen.getByLabelText('Base URL')).toHaveValue(llama.base_url);
+    expect(screen.getByLabelText('默认模型')).toHaveValue(llama.default_model);
+
+    await user.click(screen.getByRole('button', { name: /^保存配置$/ }));
+
+    await waitFor(() => {
+      expect(providerApi.updateProviderConfig).toHaveBeenCalledWith('llama-local', {
+        base_url: llama.base_url,
+        default_model: llama.default_model,
+        is_default: true,
+      });
+    });
+  });
+
   it('shows the API error when the connection test cannot start', async () => {
     providerApi.testProvider.mockRejectedValue(
       new ApiError(422, 'PROVIDER_API_KEY_REQUIRED', 'This provider requires an API key'),

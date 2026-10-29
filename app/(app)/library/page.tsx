@@ -8,6 +8,7 @@ import {
   Folder as FolderIcon,
   FolderPlus,
   Pencil,
+  Play,
   Plus,
   Search,
   Trash2,
@@ -100,6 +101,13 @@ function CourseCard({
             <ArrowUpRight className='h-3.5 w-3.5' />
           </Link>
           <div className='flex items-center gap-1'>
+            <Link
+              href={`/classroom/${course.id}`}
+              className='mr-1 inline-flex h-8 items-center gap-1.5 border border-ink/15 px-2.5 font-mono text-[0.48rem] uppercase tracking-[0.12em] text-ink/55 transition-colors hover:border-ember/40 hover:text-ember'
+            >
+              <Play className='h-3 w-3' />
+              课堂
+            </Link>
             <button
               type='button'
               onClick={() => onEdit(course)}
