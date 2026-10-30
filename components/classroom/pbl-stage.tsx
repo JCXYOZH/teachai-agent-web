@@ -1,23 +1,61 @@
 'use client';
 
-import { Check, FolderKanban, RotateCcw, Target } from 'lucide-react';
+import { Check, FolderKanban, Target } from 'lucide-react';
 import { useState } from 'react';
 
+import { submitClassroomResponses } from '@/lib/api/classroom';
 import type { ClassroomPblContent } from '@/lib/api/types';
 import { cn } from '@/lib/utils/cn';
 
-export function PblStage({ content }: { content: ClassroomPblContent }) {
+interface PblStageProps {
+  content: ClassroomPblContent;
+  courseId: string;
+  sceneId: string;
+  initialCompleted?: Record<string, boolean>;
+}
+
+export function PblStage({
+  content,
+  courseId,
+  sceneId,
+  initialCompleted,
+}: PblStageProps) {
   const project = content.project;
   const milestones = Array.isArray(project?.milestones) ? project.milestones : [];
   const microtasks = milestones.flatMap((milestone) => milestone.microtasks ?? []);
-  const [completed, setCompleted] = useState<Record<string, boolean>>({});
+  const [completed, setCompleted] = useState<Record<string, boolean>>(
+    initialCompleted ?? {},
+  );
+  const [saving, setSaving] = useState<Record<string, boolean>>({});
+  const [error, setError] = useState<string | null>(null);
 
   const completedCount = microtasks.filter((task) => completed[task.id]).length;
   const progress =
     microtasks.length > 0 ? Math.round((completedCount / microtasks.length) * 100) : 0;
 
-  const toggle = (taskId: string) => {
-    setCompleted((current) => ({ ...current, [taskId]: !current[taskId] }));
+  const toggle = async (taskId: string) => {
+    const nextValue = !completed[taskId];
+    setCompleted((current) => ({ ...current, [taskId]: nextValue }));
+    setSaving((current) => ({ ...current, [taskId]: true }));
+    setError(null);
+    try {
+      await submitClassroomResponses(courseId, sceneId, [
+        {
+          kind: 'microtask',
+          target_id: taskId,
+          answer: { completed: nextValue },
+        },
+      ]);
+    } catch {
+      setCompleted((current) => ({ ...current, [taskId]: !nextValue }));
+      setError('进度保存失败，请检查网络后重试。');
+    } finally {
+      setSaving((current) => {
+        const next = { ...current };
+        delete next[taskId];
+        return next;
+      });
+    }
   };
 
   return (
@@ -39,15 +77,19 @@ export function PblStage({ content }: { content: ClassroomPblContent }) {
               </p>
             ) : null}
           </div>
-          <button
-            type='button'
-            onClick={() => setCompleted({})}
-            className='inline-flex h-9 shrink-0 items-center gap-2 border border-chalk/15 px-3 font-mono text-[0.55rem] uppercase tracking-[0.14em] text-chalk/60 transition-colors hover:border-sage/40 hover:text-chalk'
-          >
-            <RotateCcw className='h-3.5 w-3.5' />
-            清空勾选
-          </button>
+          <p className='inline-flex shrink-0 items-center gap-2 border border-chalk/10 px-3 py-2 font-mono text-[0.5rem] uppercase tracking-[0.12em] text-chalk/35'>
+            {Object.values(saving).some(Boolean) ? 'Saving…' : 'Auto-saved'}
+          </p>
         </header>
+
+        {error ? (
+          <p
+            role='alert'
+            className='mt-4 border border-ember/40 bg-ember/10 px-3 py-2 text-[0.75rem] leading-6 text-ember'
+          >
+            {error}
+          </p>
+        ) : null}
 
         <div className='mt-4 flex flex-wrap gap-x-6 gap-y-2 text-[0.72rem] leading-6'>
           {project?.learningObjective ? (
@@ -115,7 +157,9 @@ export function PblStage({ content }: { content: ClassroomPblContent }) {
                       <li key={task.id}>
                         <button
                           type='button'
-                          onClick={() => toggle(task.id)}
+                          onClick={() => {
+                            void toggle(task.id);
+                          }}
                           aria-pressed={isDone}
                           className={cn(
                             'flex w-full items-start gap-3 border px-3 py-3 text-left transition-colors',
@@ -188,7 +232,7 @@ export function PblStage({ content }: { content: ClassroomPblContent }) {
             />
           </div>
           <p className='mt-3 text-[0.68rem] leading-6 text-chalk/30'>
-            勾选记录暂存在本页，刷新后会重置；作答提交与进展同步在下一阶段接入。
+            勾选会自动保存到你的课堂记录，重新进入课堂时会恢复进度。
           </p>
         </div>
       </div>

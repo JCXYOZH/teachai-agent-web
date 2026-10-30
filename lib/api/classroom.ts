@@ -1,7 +1,10 @@
 import { apiRequest } from '@/lib/api/client';
 import type {
   Classroom,
+  ClassroomAnswerItem,
   ClassroomGeneratePayload,
+  ClassroomResponsesPayload,
+  ClassroomSubmitResult,
   GenerationJob,
 } from '@/lib/api/types';
 
@@ -17,4 +20,23 @@ export function generateClassroom(
     method: 'POST',
     body: payload,
   });
+}
+
+export function submitClassroomResponses(
+  courseId: string,
+  sceneId: string,
+  responses: ClassroomAnswerItem[],
+): Promise<ClassroomSubmitResult> {
+  return apiRequest<ClassroomSubmitResult>(
+    `/courses/${courseId}/classroom/scenes/${sceneId}/responses`,
+    { method: 'PUT', body: { responses } },
+  );
+}
+
+export function getClassroomResponses(
+  courseId: string,
+): Promise<ClassroomResponsesPayload> {
+  return apiRequest<ClassroomResponsesPayload>(
+    `/courses/${courseId}/classroom/responses`,
+  );
 }

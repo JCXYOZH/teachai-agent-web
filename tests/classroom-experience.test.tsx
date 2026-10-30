@@ -18,6 +18,8 @@ import { useAuthStore } from '@/lib/stores/auth-store';
 const classroomApi = vi.hoisted(() => ({
   getClassroom: vi.fn(),
   generateClassroom: vi.fn(),
+  getClassroomResponses: vi.fn(),
+  submitClassroomResponses: vi.fn(),
 }));
 
 const generationApi = vi.hoisted(() => ({
@@ -227,6 +229,17 @@ describe('ClassroomExperience', () => {
     libraryApi.getCourse.mockResolvedValue(course);
     classroomApi.getClassroom.mockResolvedValue(classroom);
     classroomApi.generateClassroom.mockResolvedValue(job);
+    classroomApi.getClassroomResponses.mockResolvedValue({
+      stage_id: 'stage-1',
+      responses: [],
+    });
+    classroomApi.submitClassroomResponses.mockResolvedValue({
+      scene_id: 'scene-2',
+      stage_id: 'stage-1',
+      results: [],
+      score: 0,
+      max_score: 0,
+    });
     generationApi.getGenerationJob.mockResolvedValue(job);
     outlineApi.getCourseOutline.mockResolvedValue(outline);
     outlineApi.generateCourseOutline.mockResolvedValue(job);
@@ -260,8 +273,25 @@ describe('ClassroomExperience', () => {
     expect(screen.getByTestId('slide-stage')).toBeInTheDocument();
   });
 
-  it('navigates to a quiz scene and reveals answers', async () => {
+  it('submits a quiz answer and shows the graded result', async () => {
     const user = userEvent.setup();
+    classroomApi.submitClassroomResponses.mockResolvedValueOnce({
+      scene_id: 'scene-2',
+      stage_id: 'stage-1',
+      results: [
+        {
+          target_id: 'scene-2-q1',
+          kind: 'question',
+          score: 1,
+          max_score: 1,
+          correct: true,
+          reference_answer: ['A'],
+          analysis: '间隔趋零时得到瞬时变化率。',
+        },
+      ],
+      score: 1,
+      max_score: 1,
+    });
     renderExperience();
 
     await screen.findByRole('button', { name: '下一场景' });
@@ -272,12 +302,28 @@ describe('ClassroomExperience', () => {
     ).toBeInTheDocument();
     expect(screen.getByText('请选择一个最符合定义的答案。')).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: '查看答案' }));
+    await user.click(screen.getByRole('button', { name: /瞬时变化率/ }));
+    await user.click(screen.getByRole('button', { name: '提交作答' }));
 
+    await waitFor(() => {
+      expect(classroomApi.submitClassroomResponses).toHaveBeenCalledWith(
+        course.id,
+        'scene-2',
+        [
+          {
+            kind: 'question',
+            target_id: 'scene-2-q1',
+            answer: ['A'],
+          },
+        ],
+      );
+    });
+
+    expect(await screen.findByText('得分 1 / 1')).toBeInTheDocument();
+    expect(screen.getByText('回答正确')).toBeInTheDocument();
     expect(screen.getByText('参考答案')).toBeInTheDocument();
     expect(screen.getByText('A. 瞬时变化率')).toBeInTheDocument();
     expect(screen.getByText('间隔趋零时得到瞬时变化率。')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '隐藏答案' })).toBeInTheDocument();
   });
 
   it('creates a missing outline before generating the classroom', async () => {

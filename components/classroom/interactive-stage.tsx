@@ -5,6 +5,7 @@ import { useMemo, useState } from 'react';
 
 import type { ClassroomInteractiveContent, ClassroomWidgetType } from '@/lib/api/types';
 import { buildInteractiveDocument } from '@/lib/classroom/interactive-document';
+import { cn } from '@/lib/utils/cn';
 
 const widgetTypeLabels: Record<ClassroomWidgetType, string> = {
   simulation: '模拟实验',
@@ -17,8 +18,10 @@ const widgetTypeLabels: Record<ClassroomWidgetType, string> = {
 
 export function InteractiveStage({
   content,
+  highlighted = false,
 }: {
   content: ClassroomInteractiveContent;
+  highlighted?: boolean;
 }) {
   const [nonce, setNonce] = useState(0);
   const html = typeof content.html === 'string' ? content.html : '';
@@ -50,7 +53,12 @@ export function InteractiveStage({
       </div>
 
       <div className='relative overflow-x-auto p-3 sm:p-4'>
-        <div className='h-[720px] w-[1280px] shrink-0 overflow-hidden border border-chalk/10 bg-[#07110e] md:h-auto md:aspect-video md:w-full'>
+        <div
+          className={cn(
+            'h-[720px] w-[1280px] shrink-0 overflow-hidden border border-chalk/10 bg-[#07110e] transition-shadow duration-500 md:h-auto md:aspect-video md:w-full',
+            highlighted ? 'outline outline-2 outline-offset-4 outline-ember/70' : null,
+          )}
+        >
           <iframe
             key={`${widgetType}-${nonce}`}
             title={`互动组件：${content.prompt || widgetLabel}`}

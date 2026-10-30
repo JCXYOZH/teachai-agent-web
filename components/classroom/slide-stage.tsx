@@ -4,8 +4,17 @@ import type { ClassroomSlideCanvas } from '@/lib/api/types';
 import { sanitizeSlideHtml } from '@/lib/classroom/sanitize-slide-html';
 import { extractSlideText } from '@/lib/classroom/slide-text';
 import { useFitScale } from '@/lib/classroom/use-fit-scale';
+import { cn } from '@/lib/utils/cn';
 
-export function SlideStage({ canvas }: { canvas: ClassroomSlideCanvas }) {
+export function SlideStage({
+  canvas,
+  hiddenElementIds = [],
+  highlightedElementId = null,
+}: {
+  canvas: ClassroomSlideCanvas;
+  hiddenElementIds?: string[];
+  highlightedElementId?: string | null;
+}) {
   const viewportWidth = canvas.viewportSize || 1280;
   const viewportHeight = Math.round(
     viewportWidth * (canvas.viewportRatio || 0.5625),
@@ -71,24 +80,33 @@ export function SlideStage({ canvas }: { canvas: ClassroomSlideCanvas }) {
         }}
       >
         <div className='pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_72%_20%,rgba(169,189,168,0.1),transparent_46%)]' />
-        {elements.map((element) => (
-          <div
-            key={element.id}
-            className='absolute overflow-hidden'
-            style={{
-              left: element.left,
-              top: element.top,
-              width: element.width,
-              height: element.height,
-              transform: `rotate(${element.rotate ?? 0}deg)`,
-              color: element.defaultColor ?? fontColor,
-              lineHeight: element.lineHeight ?? 1.4,
-            }}
-            dangerouslySetInnerHTML={{
-              __html: sanitizeSlideHtml(element.content),
-            }}
-          />
-        ))}
+        {elements.map((element) => {
+          const hidden = hiddenElementIds.includes(element.id);
+          return (
+            <div
+              key={element.id}
+              className={cn(
+                'absolute overflow-hidden transition-opacity duration-500',
+                hidden ? 'opacity-0' : 'opacity-100',
+                highlightedElementId === element.id
+                  ? 'outline outline-2 outline-offset-4 outline-ember/70'
+                  : null,
+              )}
+              style={{
+                left: element.left,
+                top: element.top,
+                width: element.width,
+                height: element.height,
+                transform: `rotate(${element.rotate ?? 0}deg)`,
+                color: element.defaultColor ?? fontColor,
+                lineHeight: element.lineHeight ?? 1.4,
+              }}
+              dangerouslySetInnerHTML={{
+                __html: sanitizeSlideHtml(element.content),
+              }}
+            />
+          );
+        })}
       </div>
       </div>
     </>

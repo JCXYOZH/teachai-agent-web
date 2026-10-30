@@ -1,10 +1,15 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { InteractiveStage } from '@/components/classroom/interactive-stage';
 import { PblStage } from '@/components/classroom/pbl-stage';
+import { submitClassroomResponses } from '@/lib/api/classroom';
 import type { ClassroomInteractiveContent, ClassroomPblContent } from '@/lib/api/types';
+
+vi.mock('@/lib/api/classroom', () => ({
+  submitClassroomResponses: vi.fn(),
+}));
 
 const interactive: ClassroomInteractiveContent = {
   type: 'interactive',
@@ -73,25 +78,70 @@ describe('InteractiveStage', () => {
 });
 
 describe('PblStage', () => {
-  it('tracks microtask completion and progress', async () => {
+  beforeEach(() => {
+    vi.mocked(submitClassroomResponses).mockResolvedValue({
+      scene_id: 'scene-p',
+      stage_id: 'stage-1',
+      results: [
+        {
+          target_id: 'scene-m1-t1',
+          kind: 'microtask',
+          score: null,
+          max_score: 0,
+          correct: true,
+          reference_answer: [],
+          analysis: null,
+        },
+      ],
+      score: 0,
+      max_score: 0,
+    });
+  });
+
+  it('persists microtask completion and updates progress', async () => {
     const user = userEvent.setup();
-    render(<PblStage content={pbl} />);
+    render(<PblStage content={pbl} courseId='course-1' sceneId='scene-p' />);
 
     expect(screen.getByText('校园能耗报告')).toBeInTheDocument();
     expect(screen.getByText('0 / 2 · 0%')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: /记录每天用电/ }));
 
+    expect(submitClassroomResponses).toHaveBeenCalledWith('course-1', 'scene-p', [
+      { kind: 'microtask', target_id: 'scene-m1-t1', answer: { completed: true } },
+    ]);
+    expect(await screen.findByText('1 / 2 · 50%')).toBeInTheDocument();
+  });
+
+  it('restores progress from saved responses', () => {
+    render(
+      <PblStage
+        content={pbl}
+        courseId='course-1'
+        sceneId='scene-p'
+        initialCompleted={{ 'scene-m1-t1': true }}
+      />,
+    );
+
     expect(screen.getByText('1 / 2 · 50%')).toBeInTheDocument();
-    expect(screen.getByText('1 / 2')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /记录每天用电/ }),
+    ).toHaveAttribute('aria-pressed', 'true');
+  });
 
-    await user.click(screen.getByRole('button', { name: /清空勾选/ }));
+  it('rolls back the toggle when saving fails', async () => {
+    const user = userEvent.setup();
+    vi.mocked(submitClassroomResponses).mockRejectedValueOnce(new Error('offline'));
+    render(<PblStage content={pbl} courseId='course-1' sceneId='scene-p' />);
 
+    await user.click(screen.getByRole('button', { name: /记录每天用电/ }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('进度保存失败');
     expect(screen.getByText('0 / 2 · 0%')).toBeInTheDocument();
   });
 
   it('shows criteria and hints for each task', () => {
-    render(<PblStage content={pbl} />);
+    render(<PblStage content={pbl} courseId='course-1' sceneId='scene-p' />);
 
     expect(screen.getByText('完成标准：七天数据齐全')).toBeInTheDocument();
     expect(screen.getByText('提示：用表格记录')).toBeInTheDocument();

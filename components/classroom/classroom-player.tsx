@@ -1,12 +1,16 @@
 'use client';
 
+import { useQuery } from '@tanstack/react-query';
 import {
   ChevronLeft,
   ChevronRight,
   CircleHelp,
   FolderKanban,
   MousePointerClick,
+  Pause,
+  Play,
   Presentation,
+  RotateCcw,
   type LucideIcon,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -15,16 +19,19 @@ import { InteractiveStage } from '@/components/classroom/interactive-stage';
 import { PblStage } from '@/components/classroom/pbl-stage';
 import { QuizStage } from '@/components/classroom/quiz-stage';
 import { SlideStage } from '@/components/classroom/slide-stage';
+import { getClassroomResponses } from '@/lib/api/classroom';
 import type {
   Classroom,
   ClassroomInteractiveContent,
   ClassroomPblContent,
   ClassroomQuizContent,
+  ClassroomResult,
   ClassroomScene,
   ClassroomSceneContent,
   ClassroomSceneType,
   ClassroomSlideContent,
 } from '@/lib/api/types';
+import { useClassroomPlayback } from '@/lib/classroom/use-classroom-playback';
 import { cn } from '@/lib/utils/cn';
 
 const sceneTypeLabels: Record<ClassroomSceneType, string> = {
@@ -201,16 +208,18 @@ function MobileSceneRail({
 function NarrationPanel({
   scene,
   classroom,
+  liveSpeech,
   className,
 }: {
   scene: ClassroomScene;
   classroom: Classroom;
+  liveSpeech?: string | null;
   className?: string;
 }) {
   const speech = scene.actions.find(
     (action) => action.type === 'speech' && typeof action.text === 'string',
   );
-  const speechText = speech?.text?.trim();
+  const speechText = (liveSpeech ?? speech?.text)?.trim();
 
   return (
     <aside
@@ -222,7 +231,9 @@ function NarrationPanel({
     >
       <div className='flex items-center justify-between font-mono text-[0.5rem] uppercase tracking-[0.18em] text-chalk/35'>
         <span>Narration</span>
-        <span>Voice / 01</span>
+        <span className={cn(liveSpeech ? 'text-ember' : null)}>
+          {liveSpeech ? 'Playing' : 'Voice / 01'}
+        </span>
       </div>
 
       <p className='mt-5 font-display text-[1.18rem] italic leading-8 text-chalk/80 sm:text-[1.28rem]'>
@@ -281,6 +292,14 @@ function NarrationPanel({
 export function ClassroomPlayer({ classroom }: { classroom: Classroom }) {
   const scenes = classroom.scenes;
   const [sceneIndex, setSceneIndex] = useState(0);
+  const scene = scenes[sceneIndex];
+  const playback = useClassroomPlayback(scene?.actions ?? [], scene?.id ?? '');
+  const responsesQuery = useQuery({
+    queryKey: ['classroom-responses', classroom.course_id],
+    queryFn: () => getClassroomResponses(classroom.course_id),
+    retry: false,
+    staleTime: 30_000,
+  });
 
   useEffect(() => {
     setSceneIndex(0);
@@ -315,7 +334,6 @@ export function ClassroomPlayer({ classroom }: { classroom: Classroom }) {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [scenes.length]);
 
-  const scene = scenes[sceneIndex];
   if (!scene) {
     return (
       <div className='mx-auto max-w-3xl px-4 py-20 text-center'>
@@ -326,6 +344,36 @@ export function ClassroomPlayer({ classroom }: { classroom: Classroom }) {
 
   const progress = scenes.length > 0 ? ((sceneIndex + 1) / scenes.length) * 100 : 0;
   const stageLabel = sceneTypeLabels[scene.type];
+  const sceneRecords = (responsesQuery.data?.responses ?? []).filter(
+    (record) => record.scene_id === scene.id,
+  );
+  const quizResults: ClassroomResult[] = sceneRecords
+    .filter((record) => record.kind === 'question')
+    .map((record) => ({
+      target_id: record.target_id,
+      kind: 'question',
+      score: record.score,
+      max_score: record.max_score,
+      correct: record.correct,
+      reference_answer: [],
+      analysis: null,
+    }));
+  const completedTasks: Record<string, boolean> = {};
+  for (const record of sceneRecords) {
+    if (record.kind === 'microtask' && record.correct) {
+      completedTasks[record.target_id] = true;
+    }
+  }
+  const revealTargets = scene.actions
+    .filter(
+      (action) => action.type === 'reveal' && typeof action.elementId === 'string',
+    )
+    .map((action) => action.elementId as string);
+  const hiddenElementIds =
+    playback.revealed === null
+      ? []
+      : revealTargets.filter((id) => !playback.revealed?.includes(id));
+  const responseKey = responsesQuery.isFetched ? 'ready' : 'loading';
 
   return (
     <div className='mx-auto grid max-w-[1720px] gap-5 px-4 py-5 sm:px-6 lg:grid-cols-[220px_minmax(0,1fr)] xl:grid-cols-[240px_minmax(0,1fr)_310px]'>
@@ -356,15 +404,81 @@ export function ClassroomPlayer({ classroom }: { classroom: Classroom }) {
             <span className='hidden sm:inline'>{sceneStageMeta[scene.type]}</span>
           </div>
 
+          {scene.actions.length > 0 ? (
+            <div className='mt-3 flex flex-wrap items-center justify-between gap-2'>
+              <div className='flex items-center gap-2'>
+                <button
+                  type='button'
+                  onClick={playback.toggle}
+                  className='inline-flex h-8 items-center gap-1.5 border border-chalk/15 px-2.5 font-mono text-[0.5rem] uppercase tracking-[0.12em] text-chalk/60 transition-colors hover:border-ember/45 hover:text-chalk'
+                >
+                  {playback.playing ? (
+                    <Pause className='h-3 w-3' />
+                  ) : (
+                    <Play className='h-3 w-3' />
+                  )}
+                  {playback.playing
+                    ? '暂停'
+                    : playback.step >= playback.total
+                      ? '重播动作'
+                      : '播放动作'}
+                </button>
+                <button
+                  type='button'
+                  onClick={playback.reset}
+                  disabled={playback.revealed === null}
+                  className='inline-flex h-8 items-center gap-1.5 border border-chalk/10 px-2.5 font-mono text-[0.5rem] uppercase tracking-[0.12em] text-chalk/40 transition-colors hover:border-chalk/25 hover:text-chalk disabled:cursor-default disabled:opacity-30'
+                >
+                  <RotateCcw className='h-3 w-3' />
+                  重置
+                </button>
+              </div>
+              <div className='flex items-center gap-1' aria-hidden='true'>
+                {scene.actions.map((action, actionIndex) => (
+                  <span
+                    key={action.id}
+                    className={cn(
+                      'h-1 w-4 transition-colors',
+                      actionIndex < playback.step ? 'bg-ember' : 'bg-chalk/15',
+                    )}
+                  />
+                ))}
+              </div>
+              <span className='font-mono text-[0.44rem] uppercase tracking-[0.14em] text-chalk/25'>
+                Action {Math.min(playback.step + 1, playback.total)} / {playback.total}
+              </span>
+            </div>
+          ) : null}
+
           <div key={scene.id} className='mt-3 animate-rise'>
             {isSlideContent(scene.content) ? (
-              <SlideStage canvas={scene.content.canvas} />
+              <SlideStage
+                canvas={scene.content.canvas}
+                hiddenElementIds={hiddenElementIds}
+                highlightedElementId={playback.highlighted}
+              />
             ) : isQuizContent(scene.content) ? (
-              <QuizStage key={scene.id} content={scene.content} />
+              <QuizStage
+                key={`${scene.id}-${responseKey}`}
+                content={scene.content}
+                courseId={classroom.course_id}
+                sceneId={scene.id}
+                initialResults={quizResults}
+              />
             ) : isInteractiveContent(scene.content) ? (
-              <InteractiveStage key={scene.id} content={scene.content} />
+              <InteractiveStage
+                key={scene.id}
+                content={scene.content}
+                highlighted={playback.highlighted === `${scene.id}-stage`}
+              />
             ) : isPblContent(scene.content) ? (
-              <PblStage key={scene.id} content={scene.content} />
+              <PblStage
+                key={`${scene.id}-${responseKey}`}
+                content={scene.content}
+                courseId={classroom.course_id}
+                sceneId={scene.id}
+                initialCompleted={completedTasks}
+              />
             ) : (
               <div className='flex min-h-[24rem] items-center justify-center border border-dashed border-chalk/15 bg-[#0B1714] p-8 text-center'>
                 <div>
@@ -425,6 +539,7 @@ export function ClassroomPlayer({ classroom }: { classroom: Classroom }) {
       <NarrationPanel
         scene={scene}
         classroom={classroom}
+        liveSpeech={playback.speech}
         className='xl:sticky xl:top-[84px] xl:self-start'
       />
     </div>

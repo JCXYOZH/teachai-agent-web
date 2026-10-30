@@ -395,3 +395,48 @@ export interface CourseOutlineGeneratePayload {
   instructions?: string;
   scene_count?: number;
 }
+
+export type ClassroomResponseKind = 'question' | 'microtask';
+
+export interface ClassroomAnswerItem {
+  kind: ClassroomResponseKind;
+  target_id: string;
+  answer: string[] | string | { completed: boolean };
+}
+
+export interface ClassroomResult {
+  target_id: string;
+  kind: ClassroomResponseKind;
+  score: number | null;
+  max_score: number;
+  correct: boolean | null;
+  reference_answer: string[];
+  analysis: string | null;
+}
+
+export interface ClassroomSubmitResult {
+  scene_id: string;
+  stage_id: string;
+  results: ClassroomResult[];
+  score: number;
+  max_score: number;
+}
+
+export interface ClassroomResponseRecord {
+  id: string;
+  course_id: string;
+  stage_id: string;
+  scene_id: string;
+  kind: ClassroomResponseKind;
+  target_id: string;
+  answer: unknown;
+  score: number | null;
+  max_score: number;
+  correct: boolean | null;
+  submitted_at: string;
+}
+
+export interface ClassroomResponsesPayload {
+  stage_id: string | null;
+  responses: ClassroomResponseRecord[];
+}
