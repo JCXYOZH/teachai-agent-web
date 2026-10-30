@@ -165,6 +165,15 @@ export interface ProviderConfig {
   default_model: string;
   is_default: boolean;
   updated_at: string | null;
+  supports_tts: boolean;
+  tts_models: string[];
+  tts_voices: string[];
+  tts_base_url: string | null;
+  tts_model: string | null;
+  tts_voice: string | null;
+  tts_effective_base_url: string | null;
+  tts_effective_model: string | null;
+  tts_effective_voice: string | null;
 }
 
 export interface ProviderConfigUpdate {
@@ -173,6 +182,10 @@ export interface ProviderConfigUpdate {
   base_url?: string | null;
   default_model?: string | null;
   is_default?: boolean;
+  tts_base_url?: string | null;
+  tts_model?: string | null;
+  tts_voice?: string | null;
+  clear_tts?: boolean;
 }
 
 export interface ProviderTestRequest {
@@ -318,6 +331,9 @@ export interface ClassroomAction {
   type: string;
   text?: string;
   speed?: number;
+  audioId?: string;
+  audioFormat?: string;
+  audioDurationMs?: number;
   [key: string]: unknown;
 }
 
@@ -357,8 +373,32 @@ export interface ClassroomGeneratePayload {
   instructions?: string;
 }
 
+export interface NarrationGeneratePayload {
+  provider_id?: string;
+  model?: string;
+  voice?: string;
+}
+
+export interface MediaAsset {
+  id: string;
+  kind: 'audio' | 'image' | 'export';
+  format: string;
+  mime_type: string;
+  size_bytes: number;
+  duration_ms: number | null;
+  provider_id: string | null;
+  model_name: string | null;
+  voice: string | null;
+  course_id: string;
+  stage_id: string;
+  scene_id: string | null;
+  action_id: string | null;
+  content_url: string;
+  created_at: string;
+}
+
 export type GenerationJobStatus = 'queued' | 'running' | 'completed' | 'failed';
-export type GenerationJobKind = 'outline' | 'classroom';
+export type GenerationJobKind = 'outline' | 'classroom' | 'narration';
 
 export interface GenerationJob {
   id: string;

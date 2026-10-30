@@ -42,6 +42,15 @@ function provider(overrides: Partial<ProviderConfig>): ProviderConfig {
     default_model: 'gpt-4o-mini',
     is_default: false,
     updated_at: null,
+    supports_tts: false,
+    tts_models: [],
+    tts_voices: [],
+    tts_base_url: null,
+    tts_model: null,
+    tts_voice: null,
+    tts_effective_base_url: null,
+    tts_effective_model: null,
+    tts_effective_voice: null,
     ...overrides,
   };
 }
@@ -62,6 +71,12 @@ const qwen = provider({
   base_url: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
   default_model: 'qwen-plus',
   updated_at: '2026-10-28T02:30:00Z',
+  supports_tts: true,
+  tts_models: ['qwen3-tts-flash'],
+  tts_voices: ['Cherry', 'Serena'],
+  tts_effective_base_url: 'https://dashscope.aliyuncs.com',
+  tts_effective_model: 'qwen3-tts-flash',
+  tts_effective_voice: 'Cherry',
 });
 
 const llama = provider({
@@ -131,9 +146,44 @@ describe('ProviderSettings', () => {
         default_model: 'qwen3.8-omni-flash',
         is_default: false,
         api_key: 'sk-new-secret-wxyz',
+        tts_base_url: null,
+        tts_model: null,
+        tts_voice: null,
       });
     });
     expect(screen.queryByDisplayValue('sk-new-secret-wxyz')).not.toBeInTheDocument();
+  });
+
+  it('saves TTS overrides for providers that support speech', async () => {
+    providerApi.updateProviderConfig.mockResolvedValue({
+      ...qwen,
+      tts_model: 'qwen3-tts-flash',
+      tts_voice: 'Serena',
+      updated_at: '2026-10-28T05:00:00Z',
+    });
+    const user = userEvent.setup();
+    renderWithClient(<ProviderSettings />);
+
+    await user.click(
+      await screen.findByRole('button', { name: /Qwen \/ DashScope/ }),
+    );
+    expect(screen.getByText('旁白语音（TTS）')).toBeInTheDocument();
+    expect(screen.getByText(/qwen3-tts-flash/)).toBeInTheDocument();
+
+    const voiceInput = screen.getByLabelText('音色');
+    await user.clear(voiceInput);
+    await user.type(voiceInput, 'Serena');
+    await user.click(screen.getByRole('button', { name: /^保存配置$/ }));
+
+    await waitFor(() => {
+      expect(providerApi.updateProviderConfig).toHaveBeenCalledWith(
+        'qwen',
+        expect.objectContaining({
+          tts_model: null,
+          tts_voice: 'Serena',
+        }),
+      );
+    });
   });
 
   it('tests unsaved base URL and model overrides', async () => {

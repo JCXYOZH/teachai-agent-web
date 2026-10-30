@@ -28,22 +28,45 @@ export interface ClassroomPlayback {
   revealed: string[] | null;
   highlighted: string | null;
   speech: string | null;
+  audioLoading: boolean;
+  audioAvailable: boolean;
   toggle: () => void;
   reset: () => void;
+}
+
+export interface ClassroomPlaybackOptions {
+  loadAudio?: (audioId: string) => Promise<string | null>;
 }
 
 export function useClassroomPlayback(
   actions: ClassroomAction[],
   resetKey: string,
+  options: ClassroomPlaybackOptions = {},
 ): ClassroomPlayback {
+  const loadAudio = options.loadAudio;
   const [playing, setPlaying] = useState(false);
   const [step, setStep] = useState(0);
   const [revealed, setRevealed] = useState<string[] | null>(null);
   const [highlighted, setHighlighted] = useState<string | null>(null);
   const [speech, setSpeech] = useState<string | null>(null);
+  const [audioLoading, setAudioLoading] = useState(false);
   const stepRef = useRef(0);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioStepRef = useRef(-1);
 
   stepRef.current = step;
+
+  const stopAudio = useCallback(() => {
+    const audio = audioRef.current;
+    if (audio) {
+      audio.onended = null;
+      audio.onerror = null;
+      audio.pause();
+    }
+    audioRef.current = null;
+    audioStepRef.current = -1;
+    setAudioLoading(false);
+  }, []);
 
   const reset = useCallback(() => {
     setPlaying(false);
@@ -51,7 +74,8 @@ export function useClassroomPlayback(
     setRevealed(null);
     setHighlighted(null);
     setSpeech(null);
-  }, []);
+    stopAudio();
+  }, [stopAudio]);
 
   useEffect(() => {
     reset();
@@ -78,6 +102,7 @@ export function useClassroomPlayback(
 
   useEffect(() => {
     if (!playing) {
+      audioRef.current?.pause();
       return undefined;
     }
     if (step >= actions.length) {
@@ -85,7 +110,16 @@ export function useClassroomPlayback(
       return undefined;
     }
     const action = actions[step];
-    const timer = window.setTimeout(() => {
+    let settled = false;
+    const advance = () => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      setStep((value) => value + 1);
+    };
+
+    const applyAction = () => {
       if (action.type === 'reveal' && typeof action.elementId === 'string') {
         const elementId = action.elementId;
         setRevealed((current) => (current ? [...current, elementId] : current));
@@ -94,10 +128,75 @@ export function useClassroomPlayback(
       } else if (action.type === 'speech' && typeof action.text === 'string') {
         setSpeech(action.text);
       }
-      setStep((value) => value + 1);
+    };
+
+    const audioId =
+      action.type === 'speech' && typeof action.audioId === 'string'
+        ? action.audioId
+        : null;
+    if (audioId && loadAudio) {
+      if (action.type === 'speech' && typeof action.text === 'string') {
+        setSpeech(action.text);
+      }
+      const existing = audioRef.current;
+      if (existing && audioStepRef.current === step && !existing.ended) {
+        void existing.play().catch(() => undefined);
+        return () => {
+          if (audioRef.current === existing) {
+            existing.pause();
+          }
+        };
+      }
+      let disposed = false;
+      let fallbackTimer: number | undefined;
+      const fallback = () => {
+        if (disposed || settled || fallbackTimer !== undefined) {
+          return;
+        }
+        fallbackTimer = window.setTimeout(advance, stepDelay(action));
+      };
+      setAudioLoading(true);
+      loadAudio(audioId)
+        .then((url) => {
+          if (disposed) {
+            return;
+          }
+          if (!url) {
+            fallback();
+            return;
+          }
+          const audio = new Audio(url);
+          audio.preload = 'auto';
+          audioRef.current = audio;
+          audioStepRef.current = step;
+          audio.onended = advance;
+          audio.onerror = fallback;
+          void audio.play().catch(fallback);
+        })
+        .catch(fallback)
+        .finally(() => {
+          if (!disposed) {
+            setAudioLoading(false);
+          }
+        });
+      return () => {
+        disposed = true;
+        if (fallbackTimer !== undefined) {
+          window.clearTimeout(fallbackTimer);
+        }
+        const audio = audioRef.current;
+        if (audio && audioStepRef.current === step) {
+          audio.pause();
+        }
+      };
+    }
+
+    const timer = window.setTimeout(() => {
+      applyAction();
+      advance();
     }, stepDelay(action));
     return () => window.clearTimeout(timer);
-  }, [actions, playing, step]);
+  }, [actions, loadAudio, playing, step]);
 
   useEffect(() => {
     if (!highlighted) {
@@ -117,6 +216,10 @@ export function useClassroomPlayback(
     revealed,
     highlighted,
     speech,
+    audioLoading,
+    audioAvailable: actions.some(
+      (action) => action.type === 'speech' && typeof action.audioId === 'string',
+    ),
     toggle,
     reset,
   };

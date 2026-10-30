@@ -17,6 +17,7 @@ describe('useClassroomPlayback', () => {
 
   afterEach(() => {
     vi.useRealTimers();
+    vi.unstubAllGlobals();
   });
 
   it('shows everything until playback starts', () => {
@@ -108,5 +109,80 @@ describe('useClassroomPlayback', () => {
       vi.advanceTimersByTime(900);
     });
     expect(result.current.revealed).toEqual(['el-1']);
+  });
+
+  it('waits for narration audio before advancing', async () => {
+    const instances: Array<{
+      onended: (() => void) | null;
+      onerror: (() => void) | null;
+      ended: boolean;
+      play: ReturnType<typeof vi.fn>;
+      pause: ReturnType<typeof vi.fn>;
+    }> = [];
+    class FakeAudio {
+      onended: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      ended = false;
+      preload = '';
+      play = vi.fn(async () => undefined);
+      pause = vi.fn();
+      constructor(public src: string) {
+        instances.push(this);
+      }
+    }
+    vi.stubGlobal('Audio', FakeAudio);
+    const voiced: ClassroomAction[] = [
+      { id: 'speech-1', type: 'speech', text: '请听这段。', audioId: 'media-1' },
+    ];
+    const loadAudio = vi.fn(async () => 'blob:media-1');
+    const { result } = renderHook(() =>
+      useClassroomPlayback(voiced, 'scene-audio', { loadAudio }),
+    );
+
+    act(() => {
+      result.current.toggle();
+    });
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(loadAudio).toHaveBeenCalledWith('media-1');
+    expect(result.current.speech).toBe('请听这段。');
+    expect(result.current.step).toBe(0);
+    expect(instances).toHaveLength(1);
+
+    act(() => {
+      instances[0].onended?.();
+    });
+
+    expect(result.current.step).toBe(1);
+    expect(result.current.playing).toBe(false);
+  });
+
+  it('falls back to text timing when narration audio is unavailable', async () => {
+    const loadAudio = vi.fn(async () => null);
+    const voiced: ClassroomAction[] = [
+      { id: 'speech-1', type: 'speech', text: '请听这段。', audioId: 'media-1' },
+    ];
+    const { result } = renderHook(() =>
+      useClassroomPlayback(voiced, 'scene-fallback', { loadAudio }),
+    );
+
+    act(() => {
+      result.current.toggle();
+    });
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(result.current.step).toBe(0);
+
+    act(() => {
+      vi.advanceTimersByTime(1800);
+    });
+
+    expect(result.current.speech).toBe('请听这段。');
+    expect(result.current.step).toBe(1);
   });
 });

@@ -1,25 +1,35 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  AudioLines,
   ChevronLeft,
   ChevronRight,
   CircleHelp,
   FolderKanban,
+  Loader2,
   MousePointerClick,
   Pause,
   Play,
   Presentation,
   RotateCcw,
+  Volume2,
   type LucideIcon,
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { toast } from 'sonner';
 
 import { InteractiveStage } from '@/components/classroom/interactive-stage';
 import { PblStage } from '@/components/classroom/pbl-stage';
 import { QuizStage } from '@/components/classroom/quiz-stage';
 import { SlideStage } from '@/components/classroom/slide-stage';
 import { getClassroomResponses } from '@/lib/api/classroom';
+import { ApiError } from '@/lib/api/client';
+import { downloadMediaBlob } from '@/lib/api/media';
+import {
+  generateClassroomNarration,
+  generateSceneNarration,
+} from '@/lib/api/narration';
 import type {
   Classroom,
   ClassroomInteractiveContent,
@@ -32,6 +42,10 @@ import type {
   ClassroomSlideContent,
 } from '@/lib/api/types';
 import { useClassroomPlayback } from '@/lib/classroom/use-classroom-playback';
+import {
+  JobPollAbortedError,
+  waitForGenerationJob,
+} from '@/lib/classroom/wait-for-job';
 import { cn } from '@/lib/utils/cn';
 
 const sceneTypeLabels: Record<ClassroomSceneType, string> = {
@@ -209,11 +223,21 @@ function NarrationPanel({
   scene,
   classroom,
   liveSpeech,
+  hasAudio,
+  busy,
+  progress,
+  onGenerateScene,
+  onGenerateAll,
   className,
 }: {
   scene: ClassroomScene;
   classroom: Classroom;
   liveSpeech?: string | null;
+  hasAudio: boolean;
+  busy: boolean;
+  progress: { message: string; progress: number } | null;
+  onGenerateScene: () => void;
+  onGenerateAll: () => void;
   className?: string;
 }) {
   const speech = scene.actions.find(
@@ -231,14 +255,52 @@ function NarrationPanel({
     >
       <div className='flex items-center justify-between font-mono text-[0.5rem] uppercase tracking-[0.18em] text-chalk/35'>
         <span>Narration</span>
-        <span className={cn(liveSpeech ? 'text-ember' : null)}>
-          {liveSpeech ? 'Playing' : 'Voice / 01'}
+        <span className={cn(liveSpeech ? 'text-ember' : hasAudio ? 'text-sage' : null)}>
+          {liveSpeech ? 'Playing' : hasAudio ? 'Audio ready' : 'Voice / 01'}
         </span>
       </div>
 
       <p className='mt-5 font-display text-[1.18rem] italic leading-8 text-chalk/80 sm:text-[1.28rem]'>
         {speechText || '本场景还没有旁白。'}
       </p>
+
+      <div className='mt-5 flex flex-wrap items-center gap-2'>
+        <button
+          type='button'
+          onClick={onGenerateScene}
+          disabled={busy}
+          className='inline-flex h-8 items-center gap-1.5 border border-ember/40 bg-ember/10 px-3 font-mono text-[0.5rem] uppercase tracking-[0.12em] text-ember transition-colors hover:bg-ember/15 disabled:cursor-default disabled:opacity-40'
+        >
+          {busy ? (
+            <Loader2 className='h-3 w-3 animate-spin' />
+          ) : (
+            <Volume2 className='h-3 w-3' />
+          )}
+          {hasAudio ? 'Regenerate scene' : 'Generate voice'}
+        </button>
+        <button
+          type='button'
+          onClick={onGenerateAll}
+          disabled={busy}
+          className='inline-flex h-8 items-center gap-1.5 border border-chalk/15 px-3 font-mono text-[0.5rem] uppercase tracking-[0.12em] text-chalk/50 transition-colors hover:border-chalk/30 hover:text-chalk disabled:cursor-default disabled:opacity-40'
+        >
+          <AudioLines className='h-3 w-3' />
+          All scenes
+        </button>
+      </div>
+      {busy ? (
+        <p className='mt-3 font-mono text-[0.5rem] uppercase tracking-[0.12em] text-chalk/35'>
+          {progress
+            ? `${progress.message} · ${progress.progress}%`
+            : '排队中…'}
+        </p>
+      ) : (
+        <p className='mt-3 text-[0.66rem] leading-5 text-chalk/30'>
+          {hasAudio
+            ? '本页旁白已合成，播放时会跟随音频时长推进。'
+            : '尚未合成音频，将按文本长度计时朗读。'}
+        </p>
+      )}
 
       <dl className='mt-6 space-y-2.5 border-t border-chalk/10 pt-4 text-xs'>
         <div className='flex items-center justify-between gap-4'>
@@ -293,7 +355,83 @@ export function ClassroomPlayer({ classroom }: { classroom: Classroom }) {
   const scenes = classroom.scenes;
   const [sceneIndex, setSceneIndex] = useState(0);
   const scene = scenes[sceneIndex];
-  const playback = useClassroomPlayback(scene?.actions ?? [], scene?.id ?? '');
+  const queryClient = useQueryClient();
+  const audioCacheRef = useRef<Map<string, string>>(new Map());
+  const narrationAbortRef = useRef<AbortController | null>(null);
+  const [narrationProgress, setNarrationProgress] = useState<{
+    message: string;
+    progress: number;
+  } | null>(null);
+
+  const clearAudioCache = useCallback(() => {
+    for (const url of audioCacheRef.current.values()) {
+      URL.revokeObjectURL(url);
+    }
+    audioCacheRef.current.clear();
+  }, []);
+
+  const loadAudio = useCallback(async (audioId: string) => {
+    const cached = audioCacheRef.current.get(audioId);
+    if (cached) {
+      return cached;
+    }
+    try {
+      const blob = await downloadMediaBlob(audioId);
+      const url = URL.createObjectURL(blob);
+      audioCacheRef.current.set(audioId, url);
+      return url;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const playback = useClassroomPlayback(scene?.actions ?? [], scene?.id ?? '', {
+    loadAudio,
+  });
+
+  const narrationMutation = useMutation({
+    mutationFn: async (sceneId?: string) => {
+      narrationAbortRef.current?.abort();
+      const controller = new AbortController();
+      narrationAbortRef.current = controller;
+      const job = sceneId
+        ? await generateSceneNarration(classroom.course_id, sceneId)
+        : await generateClassroomNarration(classroom.course_id);
+      return waitForGenerationJob(job.id, {
+        signal: controller.signal,
+        onProgress: (update) =>
+          setNarrationProgress({
+            message: update.message,
+            progress: update.progress,
+          }),
+      });
+    },
+    onSuccess: async (job) => {
+      setNarrationProgress(null);
+      clearAudioCache();
+      toast.success(
+        job.scene_count > 0
+          ? `旁白已就绪 · ${job.scene_count} 个场景`
+          : '旁白任务已完成',
+      );
+      await queryClient.invalidateQueries({
+        queryKey: ['classroom', classroom.course_id],
+      });
+    },
+    onError: (error) => {
+      setNarrationProgress(null);
+      if (error instanceof JobPollAbortedError) {
+        return;
+      }
+      toast.error(
+        error instanceof ApiError ? error.message : '旁白生成失败，请稍后再试',
+      );
+    },
+  });
+
+  useEffect(() => clearAudioCache, [clearAudioCache]);
+
+  useEffect(() => () => narrationAbortRef.current?.abort(), []);
   const responsesQuery = useQuery({
     queryKey: ['classroom-responses', classroom.course_id],
     queryFn: () => getClassroomResponses(classroom.course_id),
@@ -401,7 +539,15 @@ export function ClassroomPlayer({ classroom }: { classroom: Classroom }) {
               <SceneTypeIcon type={scene.type} className='h-3 w-3 text-sage' />
               {stageLabel}
             </span>
-            <span className='hidden sm:inline'>{sceneStageMeta[scene.type]}</span>
+            <span
+              className={cn(
+                'hidden sm:inline',
+                playback.audioAvailable ? 'text-sage/70' : null,
+              )}
+            >
+              {playback.audioAvailable ? 'Audio · ' : 'Text · '}
+              {sceneStageMeta[scene.type]}
+            </span>
           </div>
 
           {scene.actions.length > 0 ? (
@@ -417,11 +563,13 @@ export function ClassroomPlayer({ classroom }: { classroom: Classroom }) {
                   ) : (
                     <Play className='h-3 w-3' />
                   )}
-                  {playback.playing
-                    ? '暂停'
-                    : playback.step >= playback.total
-                      ? '重播动作'
-                      : '播放动作'}
+                  {playback.audioLoading
+                    ? '加载旁白…'
+                    : playback.playing
+                      ? '暂停'
+                      : playback.step >= playback.total
+                        ? '重播动作'
+                        : '播放动作'}
                 </button>
                 <button
                   type='button'
@@ -540,6 +688,11 @@ export function ClassroomPlayer({ classroom }: { classroom: Classroom }) {
         scene={scene}
         classroom={classroom}
         liveSpeech={playback.speech}
+        hasAudio={playback.audioAvailable}
+        busy={narrationMutation.isLoading}
+        progress={narrationProgress}
+        onGenerateScene={() => narrationMutation.mutate(scene.id)}
+        onGenerateAll={() => narrationMutation.mutate(undefined)}
         className='xl:sticky xl:top-[84px] xl:self-start'
       />
     </div>

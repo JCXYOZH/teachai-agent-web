@@ -11,6 +11,7 @@ import {
   Save,
   ShieldCheck,
   Trash2,
+  Volume2,
   XCircle,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
@@ -184,6 +185,10 @@ function ProviderEditor({ provider }: { provider: ProviderConfig }) {
   const [model, setModel] = useState(provider.default_model);
   const [isDefault, setIsDefault] = useState(provider.is_default);
   const [clearApiKey, setClearApiKey] = useState(false);
+  const [ttsBaseUrl, setTtsBaseUrl] = useState(provider.tts_base_url ?? '');
+  const [ttsModel, setTtsModel] = useState(provider.tts_model ?? '');
+  const [ttsVoice, setTtsVoice] = useState(provider.tts_voice ?? '');
+  const [clearTts, setClearTts] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [testResult, setTestResult] = useState<ProviderTestResponse | null>(null);
 
@@ -221,6 +226,10 @@ function ProviderEditor({ provider }: { provider: ProviderConfig }) {
       setBaseUrl(updated.base_url);
       setModel(updated.default_model);
       setIsDefault(updated.is_default);
+      setTtsBaseUrl(updated.tts_base_url ?? '');
+      setTtsModel(updated.tts_model ?? '');
+      setTtsVoice(updated.tts_voice ?? '');
+      setClearTts(false);
       setTestResult(null);
       toast.success(`${updated.label} 配置已保存`);
     },
@@ -267,6 +276,15 @@ function ProviderEditor({ provider }: { provider: ProviderConfig }) {
       payload.api_key = apiKey.trim();
     } else if (clearApiKey) {
       payload.clear_api_key = true;
+    }
+    if (provider.supports_tts) {
+      if (clearTts) {
+        payload.clear_tts = true;
+      } else {
+        payload.tts_base_url = ttsBaseUrl.trim() || null;
+        payload.tts_model = ttsModel.trim() || null;
+        payload.tts_voice = ttsVoice.trim() || null;
+      }
     }
     saveMutation.mutate(payload);
   };
@@ -462,6 +480,92 @@ function ProviderEditor({ provider }: { provider: ProviderConfig }) {
             </span>
           </label>
         </div>
+
+        {provider.supports_tts ? (
+          <div className='border-t border-ink/10 pt-5'>
+            <div className='flex flex-wrap items-center justify-between gap-2'>
+              <p className='flex items-center gap-2 text-xs text-ink/65'>
+                <Volume2 className='h-3.5 w-3.5 text-ember' strokeWidth={1.6} />
+                旁白语音（TTS）
+              </p>
+              <span className='font-mono text-[0.55rem] uppercase tracking-[0.12em] text-ink/30'>
+                {provider.tts_effective_model ?? 'not configured'} ·{' '}
+                {provider.tts_effective_voice ?? 'default voice'}
+              </span>
+            </div>
+            <div className='mt-3 grid gap-4 sm:grid-cols-3'>
+              <div>
+                <label htmlFor='provider-tts-model' className='text-xs text-ink/60'>
+                  TTS 模型
+                </label>
+                <Input
+                  id='provider-tts-model'
+                  list='provider-tts-model-options'
+                  value={ttsModel}
+                  onChange={(event) => setTtsModel(event.target.value)}
+                  placeholder={provider.tts_effective_model ?? provider.tts_models[0] ?? ''}
+                  spellCheck={false}
+                  disabled={clearTts}
+                  className='mt-2 font-mono text-[0.82rem]'
+                />
+                <datalist id='provider-tts-model-options'>
+                  {provider.tts_models.map((suggestion) => (
+                    <option key={suggestion} value={suggestion} />
+                  ))}
+                </datalist>
+              </div>
+              <div>
+                <label htmlFor='provider-tts-voice' className='text-xs text-ink/60'>
+                  音色
+                </label>
+                <Input
+                  id='provider-tts-voice'
+                  list='provider-tts-voice-options'
+                  value={ttsVoice}
+                  onChange={(event) => setTtsVoice(event.target.value)}
+                  placeholder={provider.tts_effective_voice ?? provider.tts_voices[0] ?? ''}
+                  spellCheck={false}
+                  disabled={clearTts}
+                  className='mt-2 font-mono text-[0.82rem]'
+                />
+                <datalist id='provider-tts-voice-options'>
+                  {provider.tts_voices.map((suggestion) => (
+                    <option key={suggestion} value={suggestion} />
+                  ))}
+                </datalist>
+              </div>
+              <div>
+                <label htmlFor='provider-tts-base-url' className='text-xs text-ink/60'>
+                  TTS Base URL
+                </label>
+                <Input
+                  id='provider-tts-base-url'
+                  value={ttsBaseUrl}
+                  onChange={(event) => setTtsBaseUrl(event.target.value)}
+                  placeholder={provider.tts_effective_base_url ?? provider.base_url}
+                  inputMode='url'
+                  spellCheck={false}
+                  disabled={clearTts}
+                  className='mt-2 font-mono text-[0.72rem]'
+                />
+              </div>
+            </div>
+            <p className='mt-2 text-[0.66rem] leading-5 text-ink/35'>
+              留空则使用默认值。旁白按场景合成并缓存到资产目录，重复文本不会重复计费。
+            </p>
+            {provider.tts_model || provider.tts_base_url || provider.tts_voice ? (
+              <label className='mt-3 flex cursor-pointer items-center gap-2 text-[0.68rem] text-ink/45'>
+                <input
+                  type='checkbox'
+                  checked={clearTts}
+                  onChange={(event) => setClearTts(event.target.checked)}
+                  className='h-3.5 w-3.5 accent-ember'
+                />
+                清除 TTS 覆盖（恢复默认模型与音色）
+              </label>
+            ) : null}
+          </div>
+        ) : null}
 
         {provider.id === 'qwen' ? (
           <div className='border-l-2 border-ochre/70 bg-ochre/[0.06] px-4 py-3 text-[0.7rem] leading-6 text-ink/50'>
