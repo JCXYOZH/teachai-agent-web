@@ -269,8 +269,11 @@ describe('ClassroomExperience', () => {
     expect(
       screen.getByText('我们先比较一段时间内的平均速度，再让时间间隔逐渐缩短。'),
     ).toBeInTheDocument();
-    expect(screen.getByText('1 / 2 · Arrow keys')).toBeInTheDocument();
+    expect(screen.getByText('1 / 2 · Drag or Arrow keys')).toBeInTheDocument();
     expect(screen.getByTestId('slide-stage')).toBeInTheDocument();
+    expect(
+      screen.getByRole('slider', { name: '拖动切换场景' }),
+    ).toBeInTheDocument();
   });
 
   it('submits a quiz answer and shows the graded result', async () => {

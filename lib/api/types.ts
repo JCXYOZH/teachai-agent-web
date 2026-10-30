@@ -240,10 +240,24 @@ export interface ClassroomSlideCanvas {
   script?: string;
 }
 
+export interface ClassroomIllustration {
+  mediaId: string;
+  format: string;
+  mimeType: string;
+  width: number;
+  height: number;
+  providerId: string | null;
+  model: string | null;
+  sha256: string;
+  updatedAt: string | null;
+  alt: string | null;
+}
+
 export interface ClassroomSlideContent {
   type: 'slide';
   schemaVersion?: number;
   canvas: ClassroomSlideCanvas;
+  illustration?: ClassroomIllustration | null;
 }
 
 export interface ClassroomQuizOption {
@@ -379,6 +393,14 @@ export interface NarrationGeneratePayload {
   voice?: string;
 }
 
+export interface IllustrationGeneratePayload {
+  provider_id?: string;
+  model?: string;
+  prompt?: string;
+  instructions?: string;
+  regenerate?: boolean;
+}
+
 export interface MediaAsset {
   id: string;
   kind: 'audio' | 'image' | 'export';
@@ -398,7 +420,7 @@ export interface MediaAsset {
 }
 
 export type GenerationJobStatus = 'queued' | 'running' | 'completed' | 'failed';
-export type GenerationJobKind = 'outline' | 'classroom' | 'narration';
+export type GenerationJobKind = 'outline' | 'classroom' | 'narration' | 'image';
 
 export interface GenerationJob {
   id: string;

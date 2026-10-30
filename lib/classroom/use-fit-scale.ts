@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 
-export function useFitScale(viewportWidth: number) {
+export function useFitScale(viewportWidth: number, viewportHeight: number) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [scale, setScale] = useState(1);
+  const [scale, setScale] = useState(0);
 
   useEffect(() => {
     const element = containerRef.current;
@@ -11,9 +11,15 @@ export function useFitScale(viewportWidth: number) {
     }
 
     const update = () => {
-      if (element.clientWidth > 0 && viewportWidth > 0) {
-        setScale(element.clientWidth / viewportWidth);
+      const width = element.clientWidth;
+      if (width <= 0 || viewportWidth <= 0) {
+        return;
       }
+      const widthScale = width / viewportWidth;
+      const height = element.clientHeight;
+      const heightScale =
+        viewportHeight > 0 && height > 0 ? height / viewportHeight : widthScale;
+      setScale(Math.min(widthScale, heightScale));
     };
 
     update();
@@ -25,7 +31,7 @@ export function useFitScale(viewportWidth: number) {
     const observer = new ResizeObserver(update);
     observer.observe(element);
     return () => observer.disconnect();
-  }, [viewportWidth]);
+  }, [viewportHeight, viewportWidth]);
 
   return { containerRef, scale };
 }

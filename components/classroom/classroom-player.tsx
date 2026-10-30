@@ -7,6 +7,7 @@ import {
   ChevronRight,
   CircleHelp,
   FolderKanban,
+  ImagePlus,
   Loader2,
   MousePointerClick,
   Pause,
@@ -25,6 +26,10 @@ import { QuizStage } from '@/components/classroom/quiz-stage';
 import { SlideStage } from '@/components/classroom/slide-stage';
 import { getClassroomResponses } from '@/lib/api/classroom';
 import { ApiError } from '@/lib/api/client';
+import {
+  generateClassroomIllustrations,
+  generateSceneIllustration,
+} from '@/lib/api/images';
 import { downloadMediaBlob } from '@/lib/api/media';
 import {
   generateClassroomNarration,
@@ -33,6 +38,7 @@ import {
 import type {
   Classroom,
   ClassroomInteractiveContent,
+  ClassroomIllustration,
   ClassroomPblContent,
   ClassroomQuizContent,
   ClassroomResult,
@@ -351,6 +357,93 @@ function NarrationPanel({
   );
 }
 
+function IllustrationPanel({
+  illustration,
+  busy,
+  progress,
+  onGenerateScene,
+  onGenerateAll,
+  className,
+}: {
+  illustration?: ClassroomIllustration | null;
+  busy: boolean;
+  progress: { message: string; progress: number } | null;
+  onGenerateScene: () => void;
+  onGenerateAll: () => void;
+  className?: string;
+}) {
+  const ready = Boolean(illustration?.mediaId);
+
+  return (
+    <aside
+      aria-live='polite'
+      className={cn(
+        'border border-chalk/10 bg-classroom/35 p-5 backdrop-blur-sm',
+        className,
+      )}
+    >
+      <div className='flex items-center justify-between font-mono text-[0.5rem] uppercase tracking-[0.18em] text-chalk/35'>
+        <span>Illustration</span>
+        <span className={ready ? 'text-sage' : 'text-chalk/30'}>
+          {ready ? 'Art ready' : 'Key visual / 01'}
+        </span>
+      </div>
+
+      <div className='mt-5 flex items-start gap-3 border border-chalk/10 bg-chalk/[0.025] p-3'>
+        <span className='flex h-10 w-10 shrink-0 items-center justify-center border border-ember/30 bg-ember/[0.08] text-ember'>
+          <ImagePlus className='h-4 w-4' strokeWidth={1.6} />
+        </span>
+        <div className='min-w-0'>
+          <p className='text-xs leading-6 text-chalk/75'>
+            {ready ? '本页主视觉已生成，播放时随幻灯片淡入。' : '为当前幻灯片生成一张教学主视觉。'}
+          </p>
+          <p className='mt-1 font-mono text-[0.44rem] uppercase tracking-[0.12em] text-chalk/28'>
+            {ready
+              ? `${illustration?.providerId ?? 'provider'} · ${illustration?.width ?? 0}×${illustration?.height ?? 0}`
+              : 'Qwen Image · Pollinations fallback'}
+          </p>
+        </div>
+      </div>
+
+      <div className='mt-4 flex flex-wrap items-center gap-2'>
+        <button
+          type='button'
+          onClick={onGenerateScene}
+          disabled={busy}
+          className='inline-flex h-8 items-center gap-1.5 border border-ember/40 bg-ember/10 px-3 font-mono text-[0.5rem] uppercase tracking-[0.12em] text-ember transition-colors hover:bg-ember/15 disabled:cursor-default disabled:opacity-40'
+        >
+          {busy ? (
+            <Loader2 className='h-3 w-3 animate-spin' />
+          ) : (
+            <ImagePlus className='h-3 w-3' />
+          )}
+          {ready ? 'Regenerate art' : 'Generate art'}
+        </button>
+        <button
+          type='button'
+          onClick={onGenerateAll}
+          disabled={busy}
+          className='inline-flex h-8 items-center gap-1.5 border border-chalk/15 px-3 font-mono text-[0.5rem] uppercase tracking-[0.12em] text-chalk/50 transition-colors hover:border-chalk/30 hover:text-chalk disabled:cursor-default disabled:opacity-40'
+        >
+          All slides
+        </button>
+      </div>
+
+      {busy ? (
+        <p className='mt-3 font-mono text-[0.5rem] uppercase tracking-[0.12em] text-chalk/35'>
+          {progress
+            ? `${progress.message} · ${progress.progress}%`
+            : '等待图片任务…'}
+        </p>
+      ) : (
+        <p className='mt-3 text-[0.66rem] leading-5 text-chalk/30'>
+          每页最多 1 张，整堂最多 6 张。图片会转为 WebP 并保存在受保护资产目录。
+        </p>
+      )}
+    </aside>
+  );
+}
+
 export function ClassroomPlayer({ classroom }: { classroom: Classroom }) {
   const scenes = classroom.scenes;
   const [sceneIndex, setSceneIndex] = useState(0);
@@ -358,7 +451,12 @@ export function ClassroomPlayer({ classroom }: { classroom: Classroom }) {
   const queryClient = useQueryClient();
   const audioCacheRef = useRef<Map<string, string>>(new Map());
   const narrationAbortRef = useRef<AbortController | null>(null);
+  const illustrationAbortRef = useRef<AbortController | null>(null);
   const [narrationProgress, setNarrationProgress] = useState<{
+    message: string;
+    progress: number;
+  } | null>(null);
+  const [illustrationProgress, setIllustrationProgress] = useState<{
     message: string;
     progress: number;
   } | null>(null);
@@ -429,9 +527,66 @@ export function ClassroomPlayer({ classroom }: { classroom: Classroom }) {
     },
   });
 
+  const illustrationMutation = useMutation({
+    mutationFn: async (sceneId?: string) => {
+      illustrationAbortRef.current?.abort();
+      const controller = new AbortController();
+      illustrationAbortRef.current = controller;
+      const targetScene = sceneId
+        ? scenes.find((candidate) => candidate.id === sceneId)
+        : null;
+      const targetIllustration =
+        targetScene && isSlideContent(targetScene.content)
+          ? targetScene.content.illustration
+          : null;
+      const payload = targetIllustration ? { regenerate: true } : {};
+      const job = sceneId
+        ? await generateSceneIllustration(
+            classroom.course_id,
+            sceneId,
+            payload,
+          )
+        : await generateClassroomIllustrations(classroom.course_id);
+      return waitForGenerationJob(job.id, {
+        signal: controller.signal,
+        onProgress: (update) =>
+          setIllustrationProgress({
+            message: update.message,
+            progress: update.progress,
+          }),
+      });
+    },
+    onSuccess: async (job) => {
+      setIllustrationProgress(null);
+      toast.success(
+        job.scene_count > 0
+          ? `配图已就绪 · ${job.scene_count} 个场景`
+          : '配图任务已完成',
+      );
+      await queryClient.invalidateQueries({
+        queryKey: ['classroom', classroom.course_id],
+      });
+    },
+    onError: (error) => {
+      setIllustrationProgress(null);
+      if (error instanceof JobPollAbortedError) {
+        return;
+      }
+      toast.error(
+        error instanceof ApiError ? error.message : '配图生成失败，请稍后再试',
+      );
+    },
+  });
+
   useEffect(() => clearAudioCache, [clearAudioCache]);
 
-  useEffect(() => () => narrationAbortRef.current?.abort(), []);
+  useEffect(
+    () => () => {
+      narrationAbortRef.current?.abort();
+      illustrationAbortRef.current?.abort();
+    },
+    [],
+  );
   const responsesQuery = useQuery({
     queryKey: ['classroom-responses', classroom.course_id],
     queryFn: () => getClassroomResponses(classroom.course_id),
@@ -512,6 +667,9 @@ export function ClassroomPlayer({ classroom }: { classroom: Classroom }) {
       ? []
       : revealTargets.filter((id) => !playback.revealed?.includes(id));
   const responseKey = responsesQuery.isFetched ? 'ready' : 'loading';
+  const currentIllustration = isSlideContent(scene.content)
+    ? scene.content.illustration
+    : null;
 
   return (
     <div className='mx-auto grid max-w-[1720px] gap-5 px-4 py-5 sm:px-6 lg:grid-cols-[220px_minmax(0,1fr)] xl:grid-cols-[240px_minmax(0,1fr)_310px]'>
@@ -602,6 +760,7 @@ export function ClassroomPlayer({ classroom }: { classroom: Classroom }) {
             {isSlideContent(scene.content) ? (
               <SlideStage
                 canvas={scene.content.canvas}
+                illustration={scene.content.illustration}
                 hiddenElementIds={hiddenElementIds}
                 highlightedElementId={playback.highlighted}
               />
@@ -657,14 +816,36 @@ export function ClassroomPlayer({ classroom }: { classroom: Classroom }) {
             </button>
 
             <div className='min-w-0 flex-1'>
-              <div className='h-1 w-full overflow-hidden bg-chalk/10'>
-                <div
-                  className='h-full bg-ember transition-all duration-300'
-                  style={{ width: `${progress}%` }}
+              <div className='group relative flex h-4 items-center'>
+                <div className='pointer-events-none h-1 w-full overflow-hidden bg-chalk/10'>
+                  <div
+                    className='h-full bg-ember transition-all duration-300'
+                    style={{ width: `${progress}%` }}
+                  />
+                </div>
+                <span
+                  className='pointer-events-none absolute top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 bg-ember transition-transform duration-200 group-hover:scale-125'
+                  style={{
+                    left: `calc(${progress}% - ${progress > 96 ? 6 : 0}px)`,
+                  }}
+                  aria-hidden='true'
+                />
+                <input
+                  type='range'
+                  min={1}
+                  max={Math.max(scenes.length, 1)}
+                  step={1}
+                  value={sceneIndex + 1}
+                  onChange={(event) =>
+                    setSceneIndex(Number(event.target.value) - 1)
+                  }
+                  aria-label='拖动切换场景'
+                  title='拖动切换场景'
+                  className='absolute inset-0 h-4 w-full cursor-pointer appearance-none bg-transparent opacity-0'
                 />
               </div>
               <p className='mt-2 text-center font-mono text-[0.46rem] uppercase tracking-[0.14em] text-chalk/25'>
-                {sceneIndex + 1} / {scenes.length} · Arrow keys
+                {sceneIndex + 1} / {scenes.length} · Drag or Arrow keys
               </p>
             </div>
 
@@ -684,17 +865,27 @@ export function ClassroomPlayer({ classroom }: { classroom: Classroom }) {
         </div>
       </section>
 
-      <NarrationPanel
-        scene={scene}
-        classroom={classroom}
-        liveSpeech={playback.speech}
-        hasAudio={playback.audioAvailable}
-        busy={narrationMutation.isLoading}
-        progress={narrationProgress}
-        onGenerateScene={() => narrationMutation.mutate(scene.id)}
-        onGenerateAll={() => narrationMutation.mutate(undefined)}
-        className='xl:sticky xl:top-[84px] xl:self-start'
-      />
+      <div className='space-y-5 xl:sticky xl:top-[84px] xl:self-start'>
+        <NarrationPanel
+          scene={scene}
+          classroom={classroom}
+          liveSpeech={playback.speech}
+          hasAudio={playback.audioAvailable}
+          busy={narrationMutation.isLoading}
+          progress={narrationProgress}
+          onGenerateScene={() => narrationMutation.mutate(scene.id)}
+          onGenerateAll={() => narrationMutation.mutate(undefined)}
+        />
+        {isSlideContent(scene.content) ? (
+          <IllustrationPanel
+            illustration={currentIllustration}
+            busy={illustrationMutation.isLoading}
+            progress={illustrationProgress}
+            onGenerateScene={() => illustrationMutation.mutate(scene.id)}
+            onGenerateAll={() => illustrationMutation.mutate(undefined)}
+          />
+        ) : null}
+      </div>
     </div>
   );
 }
