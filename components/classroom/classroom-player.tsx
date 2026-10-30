@@ -4,15 +4,21 @@ import {
   ChevronLeft,
   ChevronRight,
   CircleHelp,
+  FolderKanban,
+  MousePointerClick,
   Presentation,
   type LucideIcon,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
+import { InteractiveStage } from '@/components/classroom/interactive-stage';
+import { PblStage } from '@/components/classroom/pbl-stage';
 import { QuizStage } from '@/components/classroom/quiz-stage';
 import { SlideStage } from '@/components/classroom/slide-stage';
 import type {
   Classroom,
+  ClassroomInteractiveContent,
+  ClassroomPblContent,
   ClassroomQuizContent,
   ClassroomScene,
   ClassroomSceneContent,
@@ -24,8 +30,22 @@ import { cn } from '@/lib/utils/cn';
 const sceneTypeLabels: Record<ClassroomSceneType, string> = {
   slide: 'Slide',
   quiz: 'Check',
-  interactive: 'Interactive',
+  interactive: 'Lab',
   pbl: 'Project',
+};
+
+const sceneStageMeta: Record<ClassroomSceneType, string> = {
+  slide: '1280 × 720',
+  quiz: 'Assessment',
+  interactive: 'Sandboxed · 1280 × 720',
+  pbl: 'Project brief',
+};
+
+const sceneTypeIcons: Record<ClassroomSceneType, LucideIcon> = {
+  slide: Presentation,
+  quiz: CircleHelp,
+  interactive: MousePointerClick,
+  pbl: FolderKanban,
 };
 
 function SceneTypeIcon({
@@ -35,7 +55,7 @@ function SceneTypeIcon({
   type: ClassroomSceneType;
   className?: string;
 }) {
-  const Icon: LucideIcon = type === 'quiz' ? CircleHelp : Presentation;
+  const Icon = sceneTypeIcons[type] ?? Presentation;
   return <Icon className={className} strokeWidth={1.6} />;
 }
 
@@ -49,6 +69,18 @@ function isQuizContent(
   content: ClassroomSceneContent,
 ): content is ClassroomQuizContent {
   return content.type === 'quiz' && 'questions' in content;
+}
+
+function isInteractiveContent(
+  content: ClassroomSceneContent,
+): content is ClassroomInteractiveContent {
+  return content.type === 'interactive' && 'html' in content;
+}
+
+function isPblContent(
+  content: ClassroomSceneContent,
+): content is ClassroomPblContent {
+  return content.type === 'pbl' && 'project' in content;
 }
 
 function SceneRail({
@@ -293,7 +325,7 @@ export function ClassroomPlayer({ classroom }: { classroom: Classroom }) {
   }
 
   const progress = scenes.length > 0 ? ((sceneIndex + 1) / scenes.length) * 100 : 0;
-  const stageLabel = scene.type === 'quiz' ? 'Check' : 'Slide';
+  const stageLabel = sceneTypeLabels[scene.type];
 
   return (
     <div className='mx-auto grid max-w-[1720px] gap-5 px-4 py-5 sm:px-6 lg:grid-cols-[220px_minmax(0,1fr)] xl:grid-cols-[240px_minmax(0,1fr)_310px]'>
@@ -321,7 +353,7 @@ export function ClassroomPlayer({ classroom }: { classroom: Classroom }) {
               <SceneTypeIcon type={scene.type} className='h-3 w-3 text-sage' />
               {stageLabel}
             </span>
-            <span className='hidden sm:inline'>{scene.type === 'quiz' ? 'Assessment' : '1280 × 720'}</span>
+            <span className='hidden sm:inline'>{sceneStageMeta[scene.type]}</span>
           </div>
 
           <div key={scene.id} className='mt-3 animate-rise'>
@@ -329,6 +361,10 @@ export function ClassroomPlayer({ classroom }: { classroom: Classroom }) {
               <SlideStage canvas={scene.content.canvas} />
             ) : isQuizContent(scene.content) ? (
               <QuizStage key={scene.id} content={scene.content} />
+            ) : isInteractiveContent(scene.content) ? (
+              <InteractiveStage key={scene.id} content={scene.content} />
+            ) : isPblContent(scene.content) ? (
+              <PblStage key={scene.id} content={scene.content} />
             ) : (
               <div className='flex min-h-[24rem] items-center justify-center border border-dashed border-chalk/15 bg-[#0B1714] p-8 text-center'>
                 <div>
@@ -339,7 +375,7 @@ export function ClassroomPlayer({ classroom }: { classroom: Classroom }) {
                     这个场景还没有渲染器
                   </p>
                   <p className='mt-2 text-xs leading-6 text-chalk/35'>
-                    互动与项目式场景会在后续阶段接入。
+                    该场景类型暂不支持渲染，请重新生成课堂。
                   </p>
                 </div>
               </div>

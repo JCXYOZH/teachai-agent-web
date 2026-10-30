@@ -37,16 +37,21 @@ export function extractSlideText(elements: ClassroomSlideElement[]): SlideTextCo
   const titleElement =
     elements.find((element) => element.textType === 'title') ??
     elements.find((element) => element.id.endsWith('-title'));
-  const bodyElement =
-    elements.find((element) => element.textType === 'content') ??
-    elements.find((element) => element.id.endsWith('-body'));
+  const bodyElements = elements.filter(
+    (element) => element.textType === 'content',
+  );
+  const legacyBody = elements.find((element) => element.id.endsWith('-body'));
+  const contentElements =
+    bodyElements.length > 0 ? bodyElements : legacyBody ? [legacyBody] : [];
   const kickerElement =
     elements.find((element) => element.textType === 'header') ??
     elements.find((element) => element.id.endsWith('-kicker'));
 
   const title = titleElement ? textOf(titleElement.content) : '';
   const kicker = kickerElement ? textOf(kickerElement.content) : '';
-  const bullets = bodyElement ? paragraphsOf(bodyElement.content) : [];
+  const bullets = contentElements.flatMap((element) =>
+    paragraphsOf(element.content),
+  );
   const seen = new Set<string>();
   const uniqueBullets: string[] = [];
   for (const bullet of bullets) {

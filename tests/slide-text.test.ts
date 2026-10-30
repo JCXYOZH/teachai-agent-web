@@ -55,4 +55,23 @@ describe('extractSlideText', () => {
 
     expect(result.bullets).toEqual(['要点 0', '要点 1', '要点 2', '要点 3']);
   });
+
+  it('collects bullets from one element per point', () => {
+    const result = extractSlideText([
+      elements[0],
+      elements[1],
+      {
+        ...elements[2],
+        id: 'scene-1-bullet-1',
+        content: '<p style="font-size:30px;">• 第一条</p>',
+      },
+      {
+        ...elements[2],
+        id: 'scene-1-bullet-2',
+        content: '<p style="font-size:30px;">• 第二条</p>',
+      },
+    ]);
+
+    expect(result.bullets).toEqual(['第一条', '第二条']);
+  });
 });

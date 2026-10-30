@@ -254,15 +254,64 @@ export interface ClassroomQuizContent {
   questions: ClassroomQuestion[];
 }
 
-export interface ClassroomOtherContent {
-  type: 'interactive' | 'pbl';
-  [key: string]: unknown;
+export type ClassroomWidgetType =
+  | 'simulation'
+  | 'diagram'
+  | 'code'
+  | 'game'
+  | 'visualization3d'
+  | 'procedural-skill';
+
+export interface ClassroomInteractiveContent {
+  type: 'interactive';
+  schemaVersion?: number;
+  widgetType?: ClassroomWidgetType;
+  prompt?: string | null;
+  html: string;
+  frame?: {
+    viewportWidth: number;
+    viewportHeight: number;
+  };
+}
+
+export type ClassroomMicrotaskStatus = 'todo' | 'in_progress' | 'completed';
+
+export interface ClassroomPblMicrotask {
+  id: string;
+  title: string;
+  description: string | null;
+  completionCriteria: string | null;
+  hints: string[];
+  status: ClassroomMicrotaskStatus;
+}
+
+export interface ClassroomPblMilestone {
+  id: string;
+  title: string;
+  description: string | null;
+  deliverable: string | null;
+  microtasks: ClassroomPblMicrotask[];
+}
+
+export interface ClassroomPblProject {
+  title: string;
+  description: string;
+  learningObjective: string | null;
+  finalDeliverable: string | null;
+  milestones: ClassroomPblMilestone[];
+}
+
+export interface ClassroomPblContent {
+  type: 'pbl';
+  schemaVersion?: number;
+  project: ClassroomPblProject;
 }
 
 export type ClassroomSceneContent =
   | ClassroomSlideContent
   | ClassroomQuizContent
-  | ClassroomOtherContent;
+  | ClassroomInteractiveContent
+  | ClassroomPblContent;
 
 export interface ClassroomAction {
   id: string;
