@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
 import type { ClassroomSlideElement } from '@/lib/api/types';
-import { extractSlideText } from '@/lib/classroom/slide-text';
+import {
+  extractSlideBulletItems,
+  extractSlideText,
+} from '@/lib/classroom/slide-text';
 
 const elements: ClassroomSlideElement[] = [
   {
@@ -73,5 +76,26 @@ describe('extractSlideText', () => {
     ]);
 
     expect(result.bullets).toEqual(['第一条', '第二条']);
+  });
+
+  it('keeps the source element id for mobile reveal playback', () => {
+    const result = extractSlideBulletItems([
+      elements[1],
+      {
+        ...elements[2],
+        id: 'scene-1-bullet-1',
+        content: '<p style="font-size:30px;">• 第一条</p>',
+      },
+      {
+        ...elements[2],
+        id: 'scene-1-bullet-2',
+        content: '<p style="font-size:30px;">• 第二条</p>',
+      },
+    ]);
+
+    expect(result).toEqual([
+      { elementId: 'scene-1-bullet-1', text: '第一条' },
+      { elementId: 'scene-1-bullet-2', text: '第二条' },
+    ]);
   });
 });

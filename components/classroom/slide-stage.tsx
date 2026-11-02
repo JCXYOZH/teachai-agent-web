@@ -9,7 +9,10 @@ import type {
   ClassroomSlideCanvas,
 } from '@/lib/api/types';
 import { sanitizeSlideHtml } from '@/lib/classroom/sanitize-slide-html';
-import { extractSlideText } from '@/lib/classroom/slide-text';
+import {
+  extractSlideBulletItems,
+  extractSlideText,
+} from '@/lib/classroom/slide-text';
 import { useFitScale } from '@/lib/classroom/use-fit-scale';
 import { cn } from '@/lib/utils/cn';
 
@@ -83,6 +86,7 @@ export function SlideStage({
     ? `"${canvas.theme.fontName}", "Microsoft YaHei", "PingFang SC", sans-serif`
     : '"Microsoft YaHei", "PingFang SC", sans-serif';
   const mobile = extractSlideText(elements);
+  const mobileBullets = extractSlideBulletItems(elements);
   const artwork = useIllustrationUrl(illustration);
 
   return (
@@ -118,17 +122,24 @@ export function SlideStage({
               </figcaption>
             </figure>
           ) : null}
-          {mobile.bullets.length > 0 ? (
+          {mobileBullets.length > 0 ? (
             <ul className='mt-6 space-y-3'>
-              {mobile.bullets.map((bullet, index) => (
-                <li
-                  key={`${index}-${bullet}`}
-                  className='flex gap-3 text-sm leading-7 text-chalk/70'
-                >
-                  <span className='mt-3 h-px w-4 shrink-0 bg-ember/70' />
-                  <span>{bullet}</span>
-                </li>
-              ))}
+              {mobileBullets.map((bullet) => {
+                const hidden = hiddenElementIds.includes(bullet.elementId);
+                return (
+                  <li
+                    key={`${bullet.elementId}-${bullet.text}`}
+                    aria-hidden={hidden || undefined}
+                    className={cn(
+                      'flex gap-3 text-sm leading-7 text-chalk/70 transition-opacity duration-500',
+                      hidden ? 'opacity-0' : 'opacity-100',
+                    )}
+                  >
+                    <span className='mt-3 h-px w-4 shrink-0 bg-ember/70' />
+                    <span>{bullet.text}</span>
+                  </li>
+                );
+              })}
             </ul>
           ) : (
             <p className='mt-6 text-sm leading-7 text-chalk/45'>本页以讲解为主。</p>

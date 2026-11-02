@@ -6,6 +6,11 @@ export interface SlideTextContent {
   bullets: string[];
 }
 
+export interface SlideBulletItem {
+  elementId: string;
+  text: string;
+}
+
 function parseBody(html: string): HTMLElement | null {
   if (typeof window === 'undefined' || typeof window.DOMParser === 'undefined') {
     return null;
@@ -33,38 +38,50 @@ function paragraphsOf(html: string): string[] {
     .filter(Boolean);
 }
 
-export function extractSlideText(elements: ClassroomSlideElement[]): SlideTextContent {
-  const titleElement =
-    elements.find((element) => element.textType === 'title') ??
-    elements.find((element) => element.id.endsWith('-title'));
+function contentElementsOf(elements: ClassroomSlideElement[]): ClassroomSlideElement[] {
   const bodyElements = elements.filter(
     (element) => element.textType === 'content',
   );
   const legacyBody = elements.find((element) => element.id.endsWith('-body'));
-  const contentElements =
-    bodyElements.length > 0 ? bodyElements : legacyBody ? [legacyBody] : [];
+  return bodyElements.length > 0 ? bodyElements : legacyBody ? [legacyBody] : [];
+}
+
+export function extractSlideBulletItems(
+  elements: ClassroomSlideElement[],
+): SlideBulletItem[] {
+  const items = contentElementsOf(elements).flatMap((element) =>
+    paragraphsOf(element.content).map((text) => ({
+      elementId: element.id,
+      text,
+    })),
+  );
+  const seen = new Set<string>();
+  const uniqueItems: SlideBulletItem[] = [];
+  for (const item of items) {
+    const key = item.text.toLowerCase();
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    uniqueItems.push(item);
+    if (uniqueItems.length >= 6) {
+      break;
+    }
+  }
+  return uniqueItems;
+}
+
+export function extractSlideText(elements: ClassroomSlideElement[]): SlideTextContent {
+  const titleElement =
+    elements.find((element) => element.textType === 'title') ??
+    elements.find((element) => element.id.endsWith('-title'));
   const kickerElement =
     elements.find((element) => element.textType === 'header') ??
     elements.find((element) => element.id.endsWith('-kicker'));
 
   const title = titleElement ? textOf(titleElement.content) : '';
   const kicker = kickerElement ? textOf(kickerElement.content) : '';
-  const bullets = contentElements.flatMap((element) =>
-    paragraphsOf(element.content),
-  );
-  const seen = new Set<string>();
-  const uniqueBullets: string[] = [];
-  for (const bullet of bullets) {
-    const key = bullet.toLowerCase();
-    if (seen.has(key)) {
-      continue;
-    }
-    seen.add(key);
-    uniqueBullets.push(bullet);
-    if (uniqueBullets.length >= 6) {
-      break;
-    }
-  }
+  const uniqueBullets = extractSlideBulletItems(elements).map((item) => item.text);
 
   return {
     kicker,

@@ -20,11 +20,17 @@ import {
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
+import { ExportPanel } from '@/components/classroom/export-panel';
 import { InteractiveStage } from '@/components/classroom/interactive-stage';
 import { PblStage } from '@/components/classroom/pbl-stage';
 import { QuizStage } from '@/components/classroom/quiz-stage';
 import { SlideStage } from '@/components/classroom/slide-stage';
 import { getClassroomResponses } from '@/lib/api/classroom';
+import {
+  createClassroomExport,
+  downloadClassroomExport,
+  listClassroomExports,
+} from '@/lib/api/exports';
 import { ApiError } from '@/lib/api/client';
 import {
   generateClassroomIllustrations,
@@ -37,6 +43,9 @@ import {
 } from '@/lib/api/narration';
 import type {
   Classroom,
+  ClassroomExport,
+  ClassroomExportFormat,
+  ClassroomExportPayload,
   ClassroomInteractiveContent,
   ClassroomIllustration,
   ClassroomPblContent,
@@ -460,6 +469,13 @@ export function ClassroomPlayer({ classroom }: { classroom: Classroom }) {
     message: string;
     progress: number;
   } | null>(null);
+  const exportAbortRef = useRef<AbortController | null>(null);
+  const [exportProgress, setExportProgress] = useState<{
+    message: string;
+    progress: number;
+  } | null>(null);
+  const [downloadingExport, setDownloadingExport] =
+    useState<ClassroomExportFormat | null>(null);
 
   const clearAudioCache = useCallback(() => {
     for (const url of audioCacheRef.current.values()) {
@@ -578,15 +594,73 @@ export function ClassroomPlayer({ classroom }: { classroom: Classroom }) {
     },
   });
 
+  const exportMutation = useMutation({
+    mutationFn: async (payload: ClassroomExportPayload) => {
+      exportAbortRef.current?.abort();
+      const controller = new AbortController();
+      exportAbortRef.current = controller;
+      const job = await createClassroomExport(classroom.course_id, payload);
+      return waitForGenerationJob(job.id, {
+        signal: controller.signal,
+        onProgress: (update) =>
+          setExportProgress({
+            message: update.message,
+            progress: update.progress,
+          }),
+      });
+    },
+    onSuccess: async (job) => {
+      setExportProgress(null);
+      toast.success(
+        job.scene_count > 0
+          ? `导出文件已就绪 · ${job.scene_count} 个场景`
+          : '导出任务已完成',
+      );
+      await queryClient.invalidateQueries({
+        queryKey: ['classroom-exports', classroom.course_id],
+      });
+    },
+    onError: (error) => {
+      setExportProgress(null);
+      if (error instanceof JobPollAbortedError) {
+        return;
+      }
+      toast.error(
+        error instanceof ApiError ? error.message : '导出失败，请稍后再试',
+      );
+    },
+  });
+
+  const handleExportDownload = useCallback(async (item: ClassroomExport) => {
+    setDownloadingExport(item.format);
+    try {
+      await downloadClassroomExport(item);
+    } catch (error) {
+      toast.error(
+        error instanceof ApiError ? error.message : '下载失败，请稍后再试',
+      );
+    } finally {
+      setDownloadingExport(null);
+    }
+  }, []);
+
   useEffect(() => clearAudioCache, [clearAudioCache]);
 
   useEffect(
     () => () => {
       narrationAbortRef.current?.abort();
       illustrationAbortRef.current?.abort();
+      exportAbortRef.current?.abort();
     },
     [],
   );
+  const exportsQuery = useQuery({
+    queryKey: ['classroom-exports', classroom.course_id],
+    queryFn: () => listClassroomExports(classroom.course_id),
+    retry: false,
+    staleTime: 15_000,
+  });
+
   const responsesQuery = useQuery({
     queryKey: ['classroom-responses', classroom.course_id],
     queryFn: () => getClassroomResponses(classroom.course_id),
@@ -885,6 +959,14 @@ export function ClassroomPlayer({ classroom }: { classroom: Classroom }) {
             onGenerateAll={() => illustrationMutation.mutate(undefined)}
           />
         ) : null}
+        <ExportPanel
+          exports={exportsQuery.data?.exports ?? []}
+          busy={exportMutation.isLoading}
+          progress={exportProgress}
+          downloadingFormat={downloadingExport}
+          onCreate={(payload) => exportMutation.mutate(payload)}
+          onDownload={handleExportDownload}
+        />
       </div>
     </div>
   );

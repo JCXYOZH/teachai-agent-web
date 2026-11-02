@@ -401,6 +401,34 @@ export interface IllustrationGeneratePayload {
   regenerate?: boolean;
 }
 
+export type ClassroomExportFormat = 'pptx' | 'html';
+
+export interface ClassroomExportPayload {
+  format?: ClassroomExportFormat;
+  include_images?: boolean;
+  include_audio?: boolean;
+}
+
+export interface ClassroomExport {
+  format: ClassroomExportFormat;
+  media_id: string;
+  filename: string;
+  mime_type: string;
+  size_bytes: number;
+  scene_count: number;
+  include_images: boolean;
+  include_audio: boolean;
+  warnings: string[];
+  content_url: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ClassroomExportsView {
+  stage_id: string;
+  exports: ClassroomExport[];
+}
+
 export interface MediaAsset {
   id: string;
   kind: 'audio' | 'image' | 'export';
@@ -420,7 +448,7 @@ export interface MediaAsset {
 }
 
 export type GenerationJobStatus = 'queued' | 'running' | 'completed' | 'failed';
-export type GenerationJobKind = 'outline' | 'classroom' | 'narration' | 'image';
+export type GenerationJobKind = 'outline' | 'classroom' | 'narration' | 'image' | 'export';
 
 export interface GenerationJob {
   id: string;

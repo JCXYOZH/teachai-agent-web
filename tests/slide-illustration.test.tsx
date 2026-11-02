@@ -106,6 +106,22 @@ describe('SlideStage illustration', () => {
   });
 });
 
+describe('SlideStage mobile playback', () => {
+  it('applies reveal visibility to the mobile bullet list', () => {
+    const { container } = render(
+      <SlideStage
+        canvas={canvas}
+        hiddenElementIds={['scene-1-bullet-1']}
+      />,
+    );
+
+    const mobileBullet = container.querySelector('li');
+    expect(mobileBullet).not.toBeNull();
+    expect(mobileBullet).toHaveClass('opacity-0');
+    expect(mobileBullet).toHaveAttribute('aria-hidden', 'true');
+  });
+});
+
 describe('generateSceneIllustration', () => {
   afterEach(() => {
     vi.unstubAllGlobals();

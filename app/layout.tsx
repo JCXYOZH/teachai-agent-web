@@ -4,6 +4,7 @@ import { Toaster } from 'sonner';
 
 import { AuthProvider } from '@/components/auth/auth-provider';
 import { QueryProvider } from '@/components/providers/query-provider';
+import { DevBfcacheGuard } from '@/components/providers/dev-bfcache-guard';
 
 import './globals.css';
 
@@ -48,6 +49,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name='viewport' content='width=device-width, initial-scale=1' />
       </head>
       <body>
+        <DevBfcacheGuard />
         <QueryProvider>
           <AuthProvider>{children}</AuthProvider>
         </QueryProvider>
