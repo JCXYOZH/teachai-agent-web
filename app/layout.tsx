@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { IBM_Plex_Mono, IBM_Plex_Sans, Libre_Baskerville } from 'next/font/google';
+import localFont from 'next/font/local';
 import { Toaster } from 'sonner';
 
 import { AuthProvider } from '@/components/auth/auth-provider';
@@ -8,24 +8,28 @@ import { DevBfcacheGuard } from '@/components/providers/dev-bfcache-guard';
 
 import './globals.css';
 
-const displayFont = Libre_Baskerville({
-  subsets: ['latin'],
-  weight: ['400', '700'],
-  style: ['normal', 'italic'],
+// Fonts are vendored under app/fonts so production builds never reach the network.
+const displayFont = localFont({
+  src: [
+    { path: './fonts/LibreBaskerville-normal.woff2', weight: '400 700', style: 'normal' },
+    { path: './fonts/LibreBaskerville-italic.woff2', weight: '400 700', style: 'italic' },
+  ],
   variable: '--font-display',
   display: 'swap',
 });
 
-const plexSans = IBM_Plex_Sans({
-  subsets: ['latin'],
-  weight: ['400', '500', '600'],
+const plexSans = localFont({
+  src: './fonts/IBMPlexSans-normal.woff2',
+  weight: '400 600',
   variable: '--font-plex-sans',
   display: 'swap',
 });
 
-const plexMono = IBM_Plex_Mono({
-  subsets: ['latin'],
-  weight: ['400', '500'],
+const plexMono = localFont({
+  src: [
+    { path: './fonts/IBMPlexMono-400.woff2', weight: '400', style: 'normal' },
+    { path: './fonts/IBMPlexMono-500.woff2', weight: '500', style: 'normal' },
+  ],
   variable: '--font-plex-mono',
   display: 'swap',
 });

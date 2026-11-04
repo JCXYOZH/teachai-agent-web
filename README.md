@@ -90,3 +90,18 @@ Vitest 当前覆盖登录表单校验、成功跳转、注册密码策略、发�
 ## 后续
 
 阶段 6C 已完成课堂导出（PPTX 保真版 + 单文件 HTML，配图与旁白内联、体积预算与鉴权下载）；后续进入生产部署（6D）：Nginx、TLS、资产挂载与 Docker 交付。
+
+## 生产部署
+
+生产是同源容器部署：宿主机 Nginx 终止 TLS，`/` 反代到 `127.0.0.1:49153`，`/api/`、`/docs`、`/static/` 反代到 `127.0.0.1:65534`。
+
+```bash
+docker compose -f docker-compose.prod.yml up -d --build
+```
+
+- `next.config.mjs` 已开启 `output: 'standalone'`，运行镜像只包含 `server.js`、`.next/static` 和 `public`。
+- `NEXT_PUBLIC_API_BASE_URL` 是构建期变量，生产值由 `docker-compose.prod.yml` 的 `build.args` 传成相对路径 `/api/v1`；修改后必须重新构建镜像，重启容器无效。
+- 运行镜像以非 root 用户 `10001:10001` 监听 `49153`，`HEALTHCHECK` 探测 `/login`。
+- 生产 compose 使用 `network_mode: host`，前端直接监听 `49153`，不创建 bridge 网络、不做端口映射。
+- 字体已本地化到 `app/fonts`，`app/layout.tsx` 使用 `next/font/local`，构建过程不访问外网字体服务。
+- 后端、Nginx、数据库与运维流程见 `teachai-agent-api/docs/deployment.md`。
