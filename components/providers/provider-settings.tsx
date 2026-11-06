@@ -71,6 +71,7 @@ export function ProviderSettings() {
     return (
       providers.find((provider) => provider.id === selectedId) ??
       providers.find((provider) => provider.is_default) ??
+      providers.find((provider) => provider.id === 'llama-local') ??
       providers[0]
     );
   }, [providers, selectedId]);
@@ -83,6 +84,10 @@ export function ProviderSettings() {
           <h2 className='mt-3 font-display text-display-md font-normal text-ink'>
             选择谁来讲这堂课
           </h2>
+          <p className='mt-3 max-w-md text-[0.72rem] leading-5 text-ink/40'>
+            生成默认使用本地 Qwen3.6-35B-A3B。只有在这里勾选「使用当前模型」并保存后，
+            大纲与课堂生成才会改用该配置；不勾选则只保存配置信息。
+          </p>
         </div>
         <p className='max-w-sm text-right text-[0.68rem] leading-5 text-ink/35'>
           每份配置只属于当前账号。密钥加密保存，接口仅回传末四位掩码。
@@ -140,7 +145,7 @@ export function ProviderSettings() {
                         {provider.label}
                       </span>
                       {provider.is_default ? (
-                        <Badge tone={active ? 'dark' : 'ember'}>默认</Badge>
+                        <Badge tone={active ? 'dark' : 'ember'}>使用中</Badge>
                       ) : null}
                     </div>
                     <div className='mt-3 flex items-center gap-2'>
@@ -259,7 +264,7 @@ function ProviderEditor({ provider }: { provider: ProviderConfig }) {
     onSuccess: () => {
       setDeleteOpen(false);
       void queryClient.invalidateQueries({ queryKey: ['providers'] });
-      toast.success('Provider 配置已删除，已回退到环境变量或默认值');
+      toast.success('Provider 配置已删除；若它正在生效，生成会回退到本地 Qwen3.6-35B-A3B');
     },
     onError: (error) => {
       toast.error(errorMessage(error, '删除 Provider 配置失败'));
@@ -322,7 +327,7 @@ function ProviderEditor({ provider }: { provider: ProviderConfig }) {
               {protocolLabel}
             </Badge>
             <Badge tone={provider.is_default ? 'ember' : 'neutral'}>
-              {provider.is_default ? 'Default' : status.label}
+              {provider.is_default ? '使用中' : status.label}
             </Badge>
           </div>
           <h3 className='mt-4 font-display text-3xl font-medium tracking-[-0.035em] text-ink'>
@@ -473,9 +478,10 @@ function ProviderEditor({ provider }: { provider: ProviderConfig }) {
               className='mt-1 h-4 w-4 accent-ember'
             />
             <span>
-              <span className='block text-xs text-ink/65'>设为默认 Provider</span>
+              <span className='block text-xs text-ink/65'>使用当前模型</span>
               <span className='mt-1 block text-[0.68rem] leading-5 text-ink/35'>
-                大纲生成与后续课堂内容会优先使用它。
+                勾选并保存后，大纲与课堂生成会改用这家配置（同时只能有一家生效）。
+                不勾选则仅保存配置信息，生成仍使用本地 Qwen3.6-35B-A3B。
               </span>
             </span>
           </label>

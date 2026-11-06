@@ -250,6 +250,16 @@ describe('ProviderSettings', () => {
     });
   });
 
+  it('describes the local default and the explicit selection switch', async () => {
+    renderWithClient(<ProviderSettings />);
+
+    expect(
+      await screen.findByText(/生成默认使用本地 Qwen3.6-35B-A3B/),
+    ).toBeInTheDocument();
+    expect(await screen.findByText('使用当前模型')).toBeInTheDocument();
+    expect(screen.getByRole('checkbox')).toBeChecked();
+  });
+
   it('shows the API error when the connection test cannot start', async () => {
     providerApi.testProvider.mockRejectedValue(
       new ApiError(422, 'PROVIDER_API_KEY_REQUIRED', 'This provider requires an API key'),
