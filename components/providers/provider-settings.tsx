@@ -42,6 +42,9 @@ function errorMessage(error: unknown, fallback: string): string {
 }
 
 function providerStatus(provider: ProviderConfig): { label: string; dot: string } {
+  if (provider.api_key_configured && provider.api_key_readable === false) {
+    return { label: '密钥失效', dot: 'bg-ember' };
+  }
   if (provider.api_key_source === 'environment') {
     return { label: '环境变量', dot: 'bg-ochre' };
   }
@@ -312,11 +315,14 @@ function ProviderEditor({ provider }: { provider: ProviderConfig }) {
   const status = providerStatus(provider);
   const protocolLabel =
     provider.protocol === 'anthropic' ? 'Anthropic Messages' : 'OpenAI compatible';
-  const keyPlaceholder = provider.api_key_configured
-    ? `已保存 ${provider.api_key_hint ?? '****'}，留空保持不变`
-    : provider.requires_api_key
-      ? 'sk-...'
-      : '本地端点可选';
+  const keyPlaceholder =
+    provider.api_key_configured && provider.api_key_readable === false
+      ? '已保存的密钥无法解密，请填写新的 API Key'
+      : provider.api_key_configured
+        ? `已保存 ${provider.api_key_hint ?? '****'}，留空保持不变`
+        : provider.requires_api_key
+          ? 'sk-...'
+          : '本地端点可选'
 
   return (
     <div className='paper-card p-6 sm:p-8'>
@@ -359,6 +365,8 @@ function ProviderEditor({ provider }: { provider: ProviderConfig }) {
             </label>
             {provider.api_key_source === 'environment' ? (
               <Badge tone='sage'>环境变量</Badge>
+            ) : provider.api_key_configured && provider.api_key_readable === false ? (
+              <Badge tone='ember'>密钥失效</Badge>
             ) : provider.api_key_configured ? (
               <Badge tone='sage'>已保存</Badge>
             ) : (
@@ -384,14 +392,23 @@ function ProviderEditor({ provider }: { provider: ProviderConfig }) {
             />
             <KeyRound className='pointer-events-none absolute right-1 top-1/2 h-4 w-4 -translate-y-1/2 text-ink/25' />
           </div>
-          <p className='mt-2 text-[0.68rem] leading-5 text-ink/35'>
-            {provider.api_key_source === 'environment'
-              ? '当前密钥来自环境变量；在此保存的密钥会优先使用。'
-              : provider.api_key_configured
-                ? `已保存 ${provider.api_key_hint ?? '****'}，不会回填真实密钥。`
-                : provider.requires_api_key
-                  ? '可通过环境变量提供，或在此保存到当前账号。'
-                  : '本地 llama-server 使用 --api-key 启动时再填写。'}
+          <p
+            className={cn(
+              'mt-2 text-[0.68rem] leading-5',
+              provider.api_key_configured && provider.api_key_readable === false
+                ? 'text-ember-dark'
+                : 'text-ink/35',
+            )}
+          >
+            {provider.api_key_configured && provider.api_key_readable === false
+              ? '已保存的密钥无法解密（服务端加密密钥已变更）。请在上方的 API Key 输入框重新填写并保存。'
+              : provider.api_key_source === 'environment'
+                ? '当前密钥来自环境变量；在此保存的密钥会优先使用。'
+                : provider.api_key_configured
+                  ? `已保存 ${provider.api_key_hint ?? '****'}，不会回填真实密钥。`
+                  : provider.requires_api_key
+                    ? '可通过环境变量提供，或在此保存到当前账号。'
+                    : '本地 llama-server 使用 --api-key 启动时再填写。'}
           </p>
           {provider.api_key_source === 'user' ? (
             <label className='mt-3 flex cursor-pointer items-center gap-2 text-[0.68rem] text-ink/45'>

@@ -9,6 +9,7 @@ import {
   FolderKanban,
   ImagePlus,
   Loader2,
+  MessageCircleQuestion,
   MousePointerClick,
   Pause,
   Play,
@@ -21,6 +22,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 import { ExportPanel } from '@/components/classroom/export-panel';
+import { TeacherChat } from '@/components/classroom/teacher-chat';
 import { InteractiveStage } from '@/components/classroom/interactive-stage';
 import { PblStage } from '@/components/classroom/pbl-stage';
 import { QuizStage } from '@/components/classroom/quiz-stage';
@@ -454,6 +456,7 @@ function IllustrationPanel({
 }
 
 export function ClassroomPlayer({ classroom }: { classroom: Classroom }) {
+  const [chatOpen, setChatOpen] = useState(false);
   const scenes = classroom.scenes;
   const [sceneIndex, setSceneIndex] = useState(0);
   const scene = scenes[sceneIndex];
@@ -767,10 +770,20 @@ export function ClassroomPlayer({ classroom }: { classroom: Classroom }) {
               Scene {String(scene.order).padStart(2, '0')} /{' '}
               {String(scenes.length).padStart(2, '0')}
             </span>
-            <span className='flex items-center gap-1.5 text-chalk/45'>
-              <SceneTypeIcon type={scene.type} className='h-3 w-3 text-sage' />
-              {stageLabel}
-            </span>
+            <div className='flex items-center gap-2'>
+              <span className='flex items-center gap-1.5 text-chalk/45'>
+                <SceneTypeIcon type={scene.type} className='h-3 w-3 text-sage' />
+                {stageLabel}
+              </span>
+              <button
+                type='button'
+                onClick={() => setChatOpen(true)}
+                className='inline-flex h-6 items-center gap-1 border border-ember/35 bg-ember/10 px-2 font-mono text-[0.5rem] uppercase tracking-[0.12em] text-ember transition-colors hover:border-ember/60 hover:bg-ember/15'
+              >
+                <MessageCircleQuestion className='h-3 w-3' />
+                问老师
+              </button>
+            </div>
             <span
               className={cn(
                 'hidden sm:inline',
@@ -968,6 +981,16 @@ export function ClassroomPlayer({ classroom }: { classroom: Classroom }) {
           onDownload={handleExportDownload}
         />
       </div>
+
+      <TeacherChat
+        courseId={classroom.course_id}
+        stageId={classroom.id}
+        stageTitle={classroom.name}
+        sceneId={scene.id}
+        sceneTitle={scene.title}
+        open={chatOpen}
+        onClose={() => setChatOpen(false)}
+      />
     </div>
   );
 }

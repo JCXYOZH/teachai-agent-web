@@ -25,6 +25,8 @@ export function classroomErrorMessage(error: unknown): string {
         return '等待生成结果超时，请稍后重试。';
       case 'GENERATION_JOB_NOT_FOUND':
         return '找不到这次生成任务，请重新生成。';
+      case 'PROVIDER_KEY_UNREADABLE':
+        return '当前模型的已保存密钥无法解密，请到设置页重新填写 API Key。';
       case 'PROVIDER_API_KEY_REQUIRED':
         return '当前默认模型缺少 API Key，请先到设置页补齐。';
       case 'COURSE_NOT_FOUND':

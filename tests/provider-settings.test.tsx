@@ -38,6 +38,7 @@ function provider(overrides: Partial<ProviderConfig>): ProviderConfig {
     api_key_configured: false,
     api_key_hint: null,
     api_key_source: null,
+    api_key_readable: true,
     base_url: 'https://api.openai.com/v1',
     default_model: 'gpt-4o-mini',
     is_default: false,
@@ -108,6 +109,30 @@ describe('ProviderSettings', () => {
     providerApi.deleteProviderConfig.mockReset();
     providerApi.testProvider.mockReset();
     providerApi.listProviders.mockResolvedValue([openai, qwen, llama]);
+  });
+
+  it('warns when the stored key cannot be decrypted', async () => {
+    providerApi.listProviders.mockResolvedValue([
+      openai,
+      provider({
+        id: 'qwen',
+        label: 'Qwen / DashScope',
+        configured: true,
+        api_key_configured: true,
+        api_key_hint: '****4321',
+        api_key_source: 'user',
+        api_key_readable: false,
+      }),
+      llama,
+    ]);
+    const user = userEvent.setup();
+    renderWithClient(<ProviderSettings />);
+
+    const qwenButtons = await screen.findAllByRole('button', { name: /Qwen/ });
+    await user.click(qwenButtons[0]);
+
+    expect(await screen.findByText(/已保存的密钥无法解密/)).toBeInTheDocument();
+    expect(screen.getAllByText('密钥失效').length).toBeGreaterThan(0);
   });
 
   it('shows provider state and selects the default provider', async () => {

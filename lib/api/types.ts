@@ -161,6 +161,7 @@ export interface ProviderConfig {
   api_key_configured: boolean;
   api_key_hint: string | null;
   api_key_source: ProviderApiKeySource | null;
+  api_key_readable: boolean;
   base_url: string;
   default_model: string;
   is_default: boolean;
@@ -529,4 +530,46 @@ export interface ClassroomResponseRecord {
 export interface ClassroomResponsesPayload {
   stage_id: string | null;
   responses: ClassroomResponseRecord[];
+}
+
+export type ChatRole = 'user' | 'assistant';
+
+export interface ChatMessage {
+  id: string;
+  role: ChatRole;
+  content: string;
+  stage_id: string | null;
+  stage_title: string | null;
+  stage_index: number | null;
+  scene_id: string | null;
+  scene_title: string | null;
+  provider_id: string | null;
+  model_name: string | null;
+  created_at: string;
+}
+
+export interface ChatThread {
+  course_id: string;
+  session_id: string | null;
+  messages: ChatMessage[];
+  daily_limit: number;
+  daily_used: number;
+  remaining_today: number;
+}
+
+export interface ChatSendPayload {
+  message: string;
+  stage_id?: string | null;
+  scene_id?: string | null;
+  include_materials?: boolean;
+}
+
+export interface ChatReply {
+  course_id: string;
+  session_id: string;
+  question: ChatMessage;
+  reply: ChatMessage;
+  daily_limit: number;
+  daily_used: number;
+  remaining_today: number;
 }

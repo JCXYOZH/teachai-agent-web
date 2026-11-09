@@ -35,10 +35,17 @@ const libraryApi = vi.hoisted(() => ({
   getCourse: vi.fn(),
 }));
 
+const chatApi = vi.hoisted(() => ({
+  getCourseChat: vi.fn(),
+  sendCourseChatMessage: vi.fn(),
+  clearCourseChat: vi.fn(),
+}));
+
 vi.mock('@/lib/api/classroom', () => classroomApi);
 vi.mock('@/lib/api/generation', () => generationApi);
 vi.mock('@/lib/api/outlines', () => outlineApi);
 vi.mock('@/lib/api/library', () => libraryApi);
+vi.mock('@/lib/api/chat', () => chatApi);
 vi.mock('sonner', () => ({
   toast: {
     success: vi.fn(),
@@ -243,6 +250,14 @@ describe('ClassroomExperience', () => {
     generationApi.getGenerationJob.mockResolvedValue(job);
     outlineApi.getCourseOutline.mockResolvedValue(outline);
     outlineApi.generateCourseOutline.mockResolvedValue(job);
+    chatApi.getCourseChat.mockResolvedValue({
+      course_id: course.id,
+      session_id: null,
+      messages: [],
+      daily_limit: 200,
+      daily_used: 0,
+      remaining_today: 200,
+    });
   });
 
   it('waits for session restore before calling the API', async () => {
@@ -274,6 +289,15 @@ describe('ClassroomExperience', () => {
     expect(
       screen.getByRole('slider', { name: '拖动切换场景' }),
     ).toBeInTheDocument();
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: /问老师/ }));
+
+    expect(
+      await screen.findByRole('dialog', { name: '课堂教师对话' }),
+    ).toBeInTheDocument();
+    expect(chatApi.getCourseChat).toHaveBeenCalledWith(course.id);
+    expect(screen.getByText('还没有提问。')).toBeInTheDocument();
   });
 
   it('submits a quiz answer and shows the graded result', async () => {
