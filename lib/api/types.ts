@@ -1,6 +1,9 @@
+export type AuthChannel = 'email' | 'phone';
+
 export interface User {
   id: string;
-  email: string;
+  email: string | null;
+  phone: string | null;
   display_name: string;
   created_at: string;
 }
@@ -13,17 +16,22 @@ export interface AuthResponse {
 }
 
 export interface LoginPayload {
-  email: string;
+  identifier: string;
   password: string;
 }
 
-export interface RegisterPayload extends LoginPayload {
+export interface RegisterPayload {
+  email?: string;
+  phone?: string;
+  password: string;
   display_name?: string;
   code: string;
 }
 
 export interface RegistrationCodeResponse {
-  email: string;
+  channel: AuthChannel;
+  target: string;
+  email: string | null;
   expires_in: number;
   resend_after: number;
 }

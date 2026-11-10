@@ -68,7 +68,7 @@ export default function SettingsPage() {
               <h2 className='truncate font-display text-2xl font-medium tracking-[-0.03em] text-ink'>
                 {user?.display_name}
               </h2>
-              <p className='mt-1 truncate font-mono text-[0.65rem] text-ink/45'>{user?.email}</p>
+              <p className='mt-1 truncate font-mono text-[0.65rem] text-ink/45'>{user?.email ?? user?.phone}</p>
             </div>
           </div>
 

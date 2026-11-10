@@ -1,9 +1,9 @@
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { AlertCircle, ArrowUpRight, Loader2, Mail } from 'lucide-react';
+import { AlertCircle, ArrowUpRight, Loader2, Mail, MessageSquare } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
@@ -19,31 +19,102 @@ import { ApiError, ApiNetworkError } from '@/lib/api/client';
 import { useAuthStore } from '@/lib/stores/auth-store';
 
 type Mode = 'login' | 'register';
+type Channel = 'phone' | 'email';
 
-const loginSchema = z.object({
-  email: z.string().trim().min(1, '请输入邮箱').email('邮箱格式不正确'),
-  password: z.string().min(1, '请输入密码').max(128, '密码过长'),
-  display_name: z.string().optional(),
-});
+const CHINA_MOBILE_PATTERN = /^1[3-9]\d{9}$/;
 
-const registerSchema = z.object({
-  email: z.string().trim().min(1, '请输入邮箱').email('邮箱格式不正确'),
-  password: z
-    .string()
-    .min(8, '密码至少需要 8 位')
-    .max(128, '密码最多 128 位')
-    .regex(/[A-Za-z]/, '密码需要包含字母')
-    .regex(/\d/, '密码需要包含数字'),
-  display_name: z.string().trim().max(80, '称呼最多 80 个字符').optional(),
-  code: z.string().trim().optional(),
-});
+function compactContact(value: string): string {
+  return value.trim().replace(/[\s\-()]/g, '').replace(/^\+?86/, '');
+}
 
-type FormValues = z.infer<typeof registerSchema>;
+function isMobileNumber(value: string): boolean {
+  return CHINA_MOBILE_PATTERN.test(compactContact(value));
+}
 
-const schemas: Record<Mode, z.ZodType<FormValues>> = {
-  login: loginSchema,
-  register: registerSchema,
-};
+function isEmailAddress(value: string): boolean {
+  return z.string().email().safeParse(value.trim()).success;
+}
+
+function normalizeContact(channel: Channel, value: string): string {
+  return channel === 'phone' ? compactContact(value) : value.trim().toLowerCase();
+}
+
+const passwordPolicy = z
+  .string()
+  .min(8, '密码至少需要 8 位')
+  .max(128, '密码最多 128 位')
+  .regex(/[A-Za-z]/, '密码需要包含字母')
+  .regex(/\d/, '密码需要包含数字');
+
+function buildSchema(mode: Mode) {
+  return z
+    .object({
+      identifier: z.string().trim().optional(),
+      channel: z.enum(['phone', 'email']),
+      contact: z.string().trim().optional(),
+      password: z.string(),
+      display_name: z.string().trim().max(80, '称呼最多 80 个字符').optional(),
+      code: z.string().trim().optional(),
+    })
+    .superRefine((values, ctx) => {
+      if (mode === 'login') {
+        const identifier = (values.identifier ?? '').trim();
+        if (!identifier || (!isMobileNumber(identifier) && !isEmailAddress(identifier))) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['identifier'],
+            message: '请输入手机号或邮箱',
+          });
+        }
+        if (!values.password) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['password'],
+            message: '请输入密码',
+          });
+        } else if (values.password.length > 128) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['password'],
+            message: '密码过长',
+          });
+        }
+        return;
+      }
+
+      const contact = (values.contact ?? '').trim();
+      if (!contact) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['contact'],
+          message: values.channel === 'phone' ? '请输入手机号' : '请输入邮箱',
+        });
+      } else if (values.channel === 'phone' && !isMobileNumber(contact)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['contact'],
+          message: '请输入 11 位手机号',
+        });
+      } else if (values.channel === 'email' && !isEmailAddress(contact)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['contact'],
+          message: '邮箱格式不正确',
+        });
+      }
+
+      const passwordResult = passwordPolicy.safeParse(values.password);
+      if (!passwordResult.success) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['password'],
+          message: passwordResult.error.issues[0]?.message ?? '密码不符合要求',
+        });
+      }
+    });
+}
+
+type FormValues = z.infer<ReturnType<typeof buildSchema>>;
 
 const copy = {
   login: {
@@ -66,14 +137,17 @@ function messageForError(error: unknown): string {
   }
   if (error instanceof ApiError) {
     const messages: Record<string, string> = {
-      INVALID_CREDENTIALS: '邮箱或密码不正确，请重新输入。',
+      INVALID_CREDENTIALS: '手机号/邮箱或密码不正确，请重新输入。',
       EMAIL_ALREADY_REGISTERED: '这个邮箱已经注册，可以直接登录。',
+      PHONE_ALREADY_REGISTERED: '这个手机号已经注册，可以直接登录。',
       EMAIL_VERIFICATION_NOT_FOUND: '请先点击“发送验证码”，再提交注册。',
+      PHONE_VERIFICATION_NOT_FOUND: '请先点击“发送验证码”，再提交注册。',
       VERIFICATION_CODE_EXPIRED: '验证码已过期，请重新发送。',
       INVALID_VERIFICATION_CODE: '验证码不正确，请检查后重试。',
       VERIFICATION_ATTEMPTS_EXCEEDED: '尝试次数过多，请重新发送验证码。',
       VERIFICATION_RESEND_TOO_SOON: '发送太频繁，请稍后再试。',
       EMAIL_DELIVERY_UNAVAILABLE: '验证邮件暂时无法发送，请稍后再试。',
+      SMS_DELIVERY_UNAVAILABLE: '验证短信暂时无法发送，请稍后再试。',
       REGISTRATION_ALREADY_PENDING: '验证码刚刚已发送，请稍候再试。',
       VALIDATION_ERROR: '请检查填写内容后重试。',
       CSRF_INVALID: '会话校验失败，请刷新页面后重试。',
@@ -110,20 +184,30 @@ function AuthForm({ mode, destination }: AuthFormProps) {
   const [codeNotice, setCodeNotice] = useState<string | null>(null);
   const [sendingCode, setSendingCode] = useState(false);
   const [seconds, setSeconds] = useState(0);
-  const [sentEmail, setSentEmail] = useState<string | null>(null);
+  const [sentTarget, setSentTarget] = useState<string | null>(null);
+  const resolver = useMemo(() => zodResolver(buildSchema(mode)), [mode]);
   const {
     register,
     handleSubmit,
     getValues,
+    setValue,
     trigger,
     watch,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
-    resolver: zodResolver(schemas[mode]),
-    defaultValues: { email: '', password: '', display_name: '', code: '' },
+    resolver,
+    defaultValues: {
+      identifier: '',
+      channel: 'phone',
+      contact: '',
+      password: '',
+      display_name: '',
+      code: '',
+    },
     mode: 'onSubmit',
   });
-  const emailValue = watch('email');
+  const channel: Channel = watch('channel');
+  const contactValue = watch('contact') ?? '';
   const codeField = register('code');
 
   useEffect(() => {
@@ -135,46 +219,71 @@ function AuthForm({ mode, destination }: AuthFormProps) {
   }, [seconds]);
 
   useEffect(() => {
-    if (!sentEmail) {
+    if (!sentTarget) {
       return;
     }
-    if (emailValue.trim().toLowerCase() !== sentEmail) {
-      setSentEmail(null);
+    if (normalizeContact(channel, contactValue) !== sentTarget) {
+      setSentTarget(null);
       setSeconds(0);
       setCodeNotice(null);
       setCodeError(null);
     }
-  }, [emailValue, sentEmail]);
+  }, [channel, contactValue, sentTarget]);
+
+  const toggleChannel = () => {
+    const nextChannel: Channel = channel === 'phone' ? 'email' : 'phone';
+    const current = getValues('contact') ?? '';
+    const keepContact =
+      nextChannel === 'phone' ? isMobileNumber(current) : isEmailAddress(current);
+    setValue('channel', nextChannel, { shouldValidate: false });
+    if (!keepContact) {
+      setValue('contact', '', { shouldValidate: false });
+    }
+    setFormError(null);
+    setCodeError(null);
+    setCodeNotice(null);
+  };
 
   const onSendCode = async () => {
     setFormError(null);
     setCodeError(null);
     setCodeNotice(null);
-    if (!(await trigger('email'))) {
+    if (!(await trigger('contact'))) {
       return;
     }
-    const email = getValues('email').trim();
+    const contact = getValues('contact')?.trim() ?? '';
+    if (!contact) {
+      return;
+    }
+    const activeChannel: Channel = getValues('channel');
     setSendingCode(true);
     try {
-      const response = await sendRegistrationCode(email);
-      setSentEmail(response.email.toLowerCase());
+      const response = await sendRegistrationCode(
+        normalizeContact(activeChannel, contact),
+        activeChannel,
+      );
+      setSentTarget(normalizeContact(activeChannel, contact));
       setSeconds(response.resend_after);
       setCodeNotice(
-        `验证码已发送至 ${response.email}，${Math.max(
+        `验证码已发送至 ${response.target}，${Math.max(
           1,
           Math.round(response.expires_in / 60),
         )} 分钟内有效。`,
       );
-      toast.success('验证码已发送，请查收邮箱');
+      toast.success(
+        activeChannel === 'phone' ? '验证码已发送，请查收短信' : '验证码已发送，请查收邮箱',
+      );
     } catch (error) {
       if (error instanceof ApiError && error.code === 'VERIFICATION_RESEND_TOO_SOON') {
-        setSentEmail(email.toLowerCase());
+        setSentTarget(normalizeContact(activeChannel, contact));
         setSeconds(retryAfterSeconds(error.details));
       }
       if (
         error instanceof ApiError &&
         (error.code === 'EMAIL_ALREADY_REGISTERED' ||
-          error.code === 'EMAIL_DELIVERY_UNAVAILABLE')
+          error.code === 'PHONE_ALREADY_REGISTERED' ||
+          error.code === 'EMAIL_DELIVERY_UNAVAILABLE' ||
+          error.code === 'SMS_DELIVERY_UNAVAILABLE')
       ) {
         setFormError(messageForError(error));
       } else {
@@ -190,21 +299,30 @@ function AuthForm({ mode, destination }: AuthFormProps) {
     setCodeError(null);
     try {
       if (mode === 'login') {
-        await loginUser({ email: values.email, password: values.password });
+        await loginUser({
+          identifier: (values.identifier ?? '').trim(),
+          password: values.password,
+        });
         toast.success('欢迎回来');
       } else {
         const code = values.code?.trim() ?? '';
+        const activeChannel: Channel = values.channel;
         if (!/^\d{6}$/.test(code)) {
-          setCodeError('请输入邮件中的 6 位验证码。');
+          setCodeError(
+            activeChannel === 'phone'
+              ? '请输入短信中的 6 位验证码。'
+              : '请输入邮件中的 6 位验证码。',
+          );
           return;
         }
+        const contact = normalizeContact(activeChannel, values.contact ?? '');
         await registerUser({
-          email: values.email,
+          ...(activeChannel === 'phone' ? { phone: contact } : { email: contact }),
           password: values.password,
           display_name: values.display_name?.trim() || undefined,
           code,
         });
-        toast.success('邮箱已验证，欢迎加入');
+        toast.success(activeChannel === 'phone' ? '手机号已验证，欢迎加入' : '邮箱已验证，欢迎加入');
       }
       router.replace(destination);
       router.refresh();
@@ -214,6 +332,7 @@ function AuthForm({ mode, destination }: AuthFormProps) {
         error instanceof ApiError &&
         [
           'EMAIL_VERIFICATION_NOT_FOUND',
+          'PHONE_VERIFICATION_NOT_FOUND',
           'VERIFICATION_CODE_EXPIRED',
           'INVALID_VERIFICATION_CODE',
           'VERIFICATION_ATTEMPTS_EXCEEDED',
@@ -225,6 +344,8 @@ function AuthForm({ mode, destination }: AuthFormProps) {
       setFormError(messageForError(error));
     }
   });
+
+  const contactLabel = channel === 'phone' ? '手机号' : '邮箱';
 
   return (
     <form className='mt-8' onSubmit={onSubmit} noValidate>
@@ -239,26 +360,59 @@ function AuthForm({ mode, destination }: AuthFormProps) {
       )}
 
       <div className='space-y-7'>
-        <div>
-          <label htmlFor='email' className='eyebrow'>
-            邮箱
-          </label>
-          <Input
-            id='email'
-            type='email'
-            inputMode='email'
-            autoComplete='email'
-            placeholder='you@school.edu'
-            invalid={Boolean(errors.email)}
-            aria-describedby={errors.email ? 'email-error' : undefined}
-            {...register('email')}
-          />
-          {errors.email && (
-            <p id='email-error' className='mt-2 text-xs text-ember-dark'>
-              {errors.email.message}
+        {mode === 'login' ? (
+          <div>
+            <label htmlFor='identifier' className='eyebrow'>
+              手机号或邮箱
+            </label>
+            <Input
+              id='identifier'
+              type='text'
+              inputMode='text'
+              autoComplete='username'
+              placeholder='13800138000 或 you@school.edu'
+              invalid={Boolean(errors.identifier)}
+              aria-describedby={errors.identifier ? 'identifier-error' : undefined}
+              {...register('identifier')}
+            />
+            {errors.identifier && (
+              <p id='identifier-error' className='mt-2 text-xs text-ember-dark'>
+                {errors.identifier.message}
+              </p>
+            )}
+          </div>
+        ) : (
+          <div>
+            <label htmlFor='contact' className='eyebrow'>
+              {contactLabel}
+            </label>
+            <Input
+              id='contact'
+              type={channel === 'phone' ? 'tel' : 'email'}
+              inputMode={channel === 'phone' ? 'tel' : 'email'}
+              autoComplete={channel === 'phone' ? 'tel' : 'email'}
+              placeholder={channel === 'phone' ? '13800138000' : 'you@school.edu'}
+              invalid={Boolean(errors.contact)}
+              aria-describedby={errors.contact ? 'contact-error' : undefined}
+              {...register('contact')}
+            />
+            {errors.contact && (
+              <p id='contact-error' className='mt-2 text-xs text-ember-dark'>
+                {errors.contact.message}
+              </p>
+            )}
+            <p className='mt-2 text-xs text-ink/40'>
+              {channel === 'phone' ? '想用邮箱注册？' : '想用手机号注册？'}
+              <button
+                type='button'
+                onClick={toggleChannel}
+                className='ml-1 text-ink/60 underline decoration-ink/20 underline-offset-4 transition-colors hover:text-ink'
+              >
+                {channel === 'phone' ? '使用邮箱注册' : '使用手机号注册'}
+              </button>
             </p>
-          )}
-        </div>
+          </div>
+        )}
 
         {mode === 'register' && (
           <div>
@@ -309,7 +463,7 @@ function AuthForm({ mode, destination }: AuthFormProps) {
         {mode === 'register' && (
           <div className='border border-ink/10 bg-ink/[0.02] px-4 py-4'>
             <label htmlFor='verification-code' className='eyebrow'>
-              邮箱验证码
+              {channel === 'phone' ? '短信验证码' : '邮箱验证码'}
             </label>
             <div className='flex flex-col gap-3 sm:flex-row sm:items-end'>
               <div className='min-w-0 flex-1'>
@@ -345,7 +499,7 @@ function AuthForm({ mode, destination }: AuthFormProps) {
                   ? '发送中…'
                   : seconds > 0
                     ? `${seconds} 秒后重发`
-                    : sentEmail
+                    : sentTarget
                       ? '重新发送'
                       : '发送验证码'}
               </Button>
@@ -361,7 +515,11 @@ function AuthForm({ mode, destination }: AuthFormProps) {
                 role='status'
                 className='mt-3 flex items-start gap-2 text-xs leading-5 text-ink/50'
               >
-                <Mail className='mt-0.5 h-3.5 w-3.5 shrink-0 text-ember-dark' />
+                {channel === 'phone' ? (
+                  <MessageSquare className='mt-0.5 h-3.5 w-3.5 shrink-0 text-ember-dark' />
+                ) : (
+                  <Mail className='mt-0.5 h-3.5 w-3.5 shrink-0 text-ember-dark' />
+                )}
                 <span>{codeNotice}</span>
               </p>
             )}

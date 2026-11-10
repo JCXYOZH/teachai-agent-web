@@ -3,6 +3,7 @@ import {
   setUnauthorizedHandler,
 } from '@/lib/api/client';
 import type {
+  AuthChannel,
   AuthResponse,
   LoginPayload,
   RegistrationCodeResponse,
@@ -37,11 +38,12 @@ export async function registerUser(
 }
 
 export async function sendRegistrationCode(
-  email: string,
+  target: string,
+  channel: AuthChannel = 'email',
 ): Promise<RegistrationCodeResponse> {
   return apiRequest<RegistrationCodeResponse>('/auth/register/send-code', {
     method: 'POST',
-    body: { email },
+    body: channel === 'phone' ? { phone: target } : { email: target },
     auth: false,
     retry: false,
   });

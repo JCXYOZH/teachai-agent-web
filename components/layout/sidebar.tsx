@@ -96,12 +96,12 @@ export function Sidebar() {
         <div className='border-t border-chalk/10 pt-5'>
           <div className='flex items-center gap-3 px-1'>
             <span className='flex h-9 w-9 shrink-0 items-center justify-center border border-sage/30 bg-sage/10 font-display text-sm text-chalk'>
-              {initials(user?.display_name ?? user?.email ?? 'TeachAI')}
+              {initials(user?.display_name ?? user?.email ?? user?.phone ?? 'TeachAI')}
             </span>
             <div className='min-w-0 flex-1'>
               <p className='truncate text-[0.78rem] text-chalk/80'>{user?.display_name}</p>
               <p className='mt-0.5 truncate font-mono text-[0.52rem] text-chalk/30'>
-                {user?.email}
+                {user?.email ?? user?.phone}
               </p>
             </div>
             <button
