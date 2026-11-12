@@ -63,6 +63,22 @@ function stageCaption(message: ChatMessage): string | null {
   return title ? `第 ${index} 幕 · ${title}` : `第 ${index} 幕`;
 }
 
+function groupedCaptions(messages: ChatMessage[]): Array<string | null> {
+  let lastKey: string | null = null;
+  return messages.map((message) => {
+    const caption = stageCaption(message);
+    if (!caption) {
+      return null;
+    }
+    const key = `${message.stage_index ?? ''}|${message.stage_title ?? ''}`;
+    if (key === lastKey) {
+      return null;
+    }
+    lastKey = key;
+    return caption;
+  });
+}
+
 export function TeacherChat({
   courseId,
   stageId,
@@ -83,6 +99,7 @@ export function TeacherChat({
   const [remaining, setRemaining] = useState<number | null>(null);
   const [dailyLimit, setDailyLimit] = useState<number | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const captions = groupedCaptions(messages);
 
   const threadQuery = useQuery({
     queryKey: ['course-chat', courseId],
@@ -247,8 +264,8 @@ export function TeacherChat({
             </div>
           ) : null}
 
-          {messages.map((message) => {
-            const caption = stageCaption(message);
+          {messages.map((message, index) => {
+            const caption = captions[index];
             const isUser = message.role === 'user';
             return (
               <div

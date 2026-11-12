@@ -271,6 +271,23 @@ describe('LoginForm', () => {
     expect(screen.getByRole('button', { name: '42 秒后重发' })).toBeDisabled();
   });
 
+  it('starts the resend cooldown when the SMS send limit is hit', async () => {
+    authMocks.sendRegistrationCode.mockRejectedValue(
+      new ApiError(429, 'SMS_SEND_RATE_LIMITED', 'Too many requests', {
+        retry_after: 55,
+      }),
+    );
+    const user = userEvent.setup();
+    render(<LoginForm />);
+
+    await user.click(screen.getByRole('tab', { name: '创建账号' }));
+    await user.type(screen.getByLabelText('手机号'), '13800138000');
+    await user.click(screen.getByRole('button', { name: '发送验证码' }));
+
+    expect(await screen.findByText(/发送太频繁/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '55 秒后重发' })).toBeDisabled();
+  });
+
   it('keeps the form open when the phone code is rejected', async () => {
     authMocks.sendRegistrationCode.mockResolvedValue(phoneCodeResponse);
     authMocks.registerUser.mockRejectedValue(

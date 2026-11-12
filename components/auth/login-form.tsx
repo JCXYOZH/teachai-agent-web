@@ -144,6 +144,7 @@ function messageForError(error: unknown): string {
       PHONE_VERIFICATION_NOT_FOUND: '请先点击“发送验证码”，再提交注册。',
       VERIFICATION_CODE_EXPIRED: '验证码已过期，请重新发送。',
       INVALID_VERIFICATION_CODE: '验证码不正确，请检查后重试。',
+      SMS_SEND_RATE_LIMITED: '发送太频繁，请稍后再试。',
       VERIFICATION_ATTEMPTS_EXCEEDED: '尝试次数过多，请重新发送验证码。',
       VERIFICATION_RESEND_TOO_SOON: '发送太频繁，请稍后再试。',
       EMAIL_DELIVERY_UNAVAILABLE: '验证邮件暂时无法发送，请稍后再试。',
@@ -274,7 +275,11 @@ function AuthForm({ mode, destination }: AuthFormProps) {
         activeChannel === 'phone' ? '验证码已发送，请查收短信' : '验证码已发送，请查收邮箱',
       );
     } catch (error) {
-      if (error instanceof ApiError && error.code === 'VERIFICATION_RESEND_TOO_SOON') {
+      if (
+        error instanceof ApiError &&
+        (error.code === 'VERIFICATION_RESEND_TOO_SOON' ||
+          error.code === 'SMS_SEND_RATE_LIMITED')
+      ) {
         setSentTarget(normalizeContact(activeChannel, contact));
         setSeconds(retryAfterSeconds(error.details));
       }

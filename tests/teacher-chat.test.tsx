@@ -192,6 +192,30 @@ describe('TeacherChat', () => {
     expect(screen.queryByText('**核心**：极限')).not.toBeInTheDocument();
   });
 
+  it('shows the stage caption once per stage group', async () => {
+    chatApi.getCourseChat.mockResolvedValue(
+      thread([
+        message({ id: 'u1', role: 'user', content: '问题一' }),
+        message({ id: 'a1', role: 'assistant', content: '回答一' }),
+        message({ id: 'u2', role: 'user', content: '问题二' }),
+        message({ id: 'a2', role: 'assistant', content: '回答二' }),
+        message({
+          id: 'a3',
+          role: 'assistant',
+          content: '回答三',
+          stage_index: 3,
+          stage_title: '导数',
+        }),
+      ]),
+    );
+
+    renderChat();
+
+    await screen.findByText('回答一');
+    expect(screen.getAllByText('第 2 幕 · 极限与连续')).toHaveLength(1);
+    expect(screen.getAllByText('第 3 幕 · 导数')).toHaveLength(1);
+  });
+
   it('sends on Enter and keeps newlines for Shift+Enter', async () => {
     chatApi.getCourseChat.mockResolvedValue(thread([]));
     chatApi.sendCourseChatMessage.mockResolvedValue({
