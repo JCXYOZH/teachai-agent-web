@@ -133,7 +133,12 @@ export function ClassroomOpening({
       setPhase('idle');
       setProgress(null);
       if (!(error instanceof JobPollAbortedError)) {
-        toast.error(classroomErrorMessage(error));
+        toast.error(classroomErrorMessage(error), {
+          action: {
+            label: '重试',
+            onClick: () => mutation.mutate(),
+          },
+        });
       }
     },
   });

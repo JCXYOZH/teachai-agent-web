@@ -59,6 +59,7 @@ import type {
   ClassroomSlideContent,
   IllustrationGeneratePayload,
 } from '@/lib/api/types';
+import { retryGenerationJobFlow } from '@/lib/classroom/retry-generation';
 import { useClassroomPlayback } from '@/lib/classroom/use-classroom-playback';
 import {
   JobPollAbortedError,
@@ -120,6 +121,23 @@ function isPblContent(
   content: ClassroomSceneContent,
 ): content is ClassroomPblContent {
   return content.type === 'pbl' && 'project' in content;
+}
+
+function retryAction(
+  jobId: string | null,
+  retry: (jobId: string) => void | Promise<void>,
+): { action: { label: string; onClick: () => void } } | undefined {
+  if (!jobId) {
+    return undefined;
+  }
+  return {
+    action: {
+      label: '重试',
+      onClick: () => {
+        void retry(jobId);
+      },
+    },
+  };
 }
 
 function SceneRail({
@@ -524,7 +542,9 @@ export function ClassroomPlayer({ classroom }: { classroom: Classroom }) {
   const queryClient = useQueryClient();
   const audioCacheRef = useRef<Map<string, string>>(new Map());
   const narrationAbortRef = useRef<AbortController | null>(null);
+  const narrationJobRef = useRef<string | null>(null);
   const illustrationAbortRef = useRef<AbortController | null>(null);
+  const illustrationJobRef = useRef<string | null>(null);
   const [narrationProgress, setNarrationProgress] = useState<{
     message: string;
     progress: number;
@@ -535,6 +555,7 @@ export function ClassroomPlayer({ classroom }: { classroom: Classroom }) {
     progress: number;
   } | null>(null);
   const exportAbortRef = useRef<AbortController | null>(null);
+  const exportJobRef = useRef<string | null>(null);
   const [exportProgress, setExportProgress] = useState<{
     message: string;
     progress: number;
@@ -568,6 +589,100 @@ export function ClassroomPlayer({ classroom }: { classroom: Classroom }) {
     loadAudio,
   });
 
+  const retryNarration = useCallback(
+    async (jobId: string) => {
+      try {
+        await retryGenerationJobFlow(jobId, {
+          onProgress: (update) =>
+            setNarrationProgress({
+              message: update.message,
+              progress: update.progress,
+            }),
+          onDone: async (job) => {
+            setNarrationProgress(null);
+            clearAudioCache();
+            toast.success(
+              job.scene_count > 0
+                ? `旁白已就绪 · ${job.scene_count} 个场景`
+                : '旁白任务已完成',
+            );
+            await queryClient.invalidateQueries({
+              queryKey: ['classroom', classroom.course_id],
+            });
+          },
+        });
+      } catch (error) {
+        setNarrationProgress(null);
+        toast.error(
+          error instanceof ApiError ? error.message : '旁白重试失败，请稍后再试',
+        );
+      }
+    },
+    [clearAudioCache, queryClient, classroom.course_id],
+  );
+
+  const retryIllustration = useCallback(
+    async (jobId: string) => {
+      try {
+        await retryGenerationJobFlow(jobId, {
+          onProgress: (update) =>
+            setIllustrationProgress({
+              message: update.message,
+              progress: update.progress,
+            }),
+          onDone: async (job) => {
+            setIllustrationProgress(null);
+            toast.success(
+              job.scene_count > 0
+                ? `配图已就绪 · ${job.scene_count} 个场景`
+                : '配图任务已完成',
+            );
+            await queryClient.invalidateQueries({
+              queryKey: ['classroom', classroom.course_id],
+            });
+          },
+        });
+      } catch (error) {
+        setIllustrationProgress(null);
+        toast.error(
+          error instanceof ApiError ? error.message : '配图重试失败，请稍后再试',
+        );
+      }
+    },
+    [queryClient, classroom.course_id],
+  );
+
+  const retryExport = useCallback(
+    async (jobId: string) => {
+      try {
+        await retryGenerationJobFlow(jobId, {
+          onProgress: (update) =>
+            setExportProgress({
+              message: update.message,
+              progress: update.progress,
+            }),
+          onDone: async (job) => {
+            setExportProgress(null);
+            toast.success(
+              job.scene_count > 0
+                ? `导出文件已就绪 · ${job.scene_count} 个场景`
+                : '导出任务已完成',
+            );
+            await queryClient.invalidateQueries({
+              queryKey: ['classroom-exports', classroom.course_id],
+            });
+          },
+        });
+      } catch (error) {
+        setExportProgress(null);
+        toast.error(
+          error instanceof ApiError ? error.message : '导出重试失败，请稍后再试',
+        );
+      }
+    },
+    [queryClient, classroom.course_id],
+  );
+
   const narrationMutation = useMutation({
     mutationFn: async (sceneId?: string) => {
       narrationAbortRef.current?.abort();
@@ -576,6 +691,7 @@ export function ClassroomPlayer({ classroom }: { classroom: Classroom }) {
       const job = sceneId
         ? await generateSceneNarration(classroom.course_id, sceneId)
         : await generateClassroomNarration(classroom.course_id);
+      narrationJobRef.current = job.id;
       return waitForGenerationJob(job.id, {
         signal: controller.signal,
         onProgress: (update) =>
@@ -604,6 +720,7 @@ export function ClassroomPlayer({ classroom }: { classroom: Classroom }) {
       }
       toast.error(
         error instanceof ApiError ? error.message : '旁白生成失败，请稍后再试',
+        retryAction(narrationJobRef.current, retryNarration),
       );
     },
   });
@@ -634,6 +751,7 @@ export function ClassroomPlayer({ classroom }: { classroom: Classroom }) {
             classroom.course_id,
             payload,
           );
+      illustrationJobRef.current = job.id;
       return waitForGenerationJob(job.id, {
         signal: controller.signal,
         onProgress: (update) =>
@@ -661,6 +779,7 @@ export function ClassroomPlayer({ classroom }: { classroom: Classroom }) {
       }
       toast.error(
         error instanceof ApiError ? error.message : '配图生成失败，请稍后再试',
+        retryAction(illustrationJobRef.current, retryIllustration),
       );
     },
   });
@@ -671,6 +790,7 @@ export function ClassroomPlayer({ classroom }: { classroom: Classroom }) {
       const controller = new AbortController();
       exportAbortRef.current = controller;
       const job = await createClassroomExport(classroom.course_id, payload);
+      exportJobRef.current = job.id;
       return waitForGenerationJob(job.id, {
         signal: controller.signal,
         onProgress: (update) =>
@@ -698,6 +818,7 @@ export function ClassroomPlayer({ classroom }: { classroom: Classroom }) {
       }
       toast.error(
         error instanceof ApiError ? error.message : '导出失败，请稍后再试',
+        retryAction(exportJobRef.current, retryExport),
       );
     },
   });
