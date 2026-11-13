@@ -6,6 +6,8 @@ import { AuthProvider } from '@/components/auth/auth-provider';
 import { QueryProvider } from '@/components/providers/query-provider';
 import { DevBfcacheGuard } from '@/components/providers/dev-bfcache-guard';
 
+import 'katex/dist/katex.min.css';
+
 import './globals.css';
 
 // Fonts are vendored under app/fonts so production builds never reach the network.

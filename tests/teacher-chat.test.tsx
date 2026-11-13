@@ -11,6 +11,7 @@ import type { ChatMessage, ChatReply, ChatThread } from '@/lib/api/types';
 const chatApi = vi.hoisted(() => ({
   getCourseChat: vi.fn(),
   sendCourseChatMessage: vi.fn(),
+  streamCourseChatMessage: vi.fn(),
   clearCourseChat: vi.fn(),
 }));
 
@@ -68,7 +69,7 @@ function renderChat(
 
 beforeEach(() => {
   chatApi.getCourseChat.mockReset();
-  chatApi.sendCourseChatMessage.mockReset();
+  chatApi.streamCourseChatMessage.mockReset();
   chatApi.clearCourseChat.mockReset();
 });
 
@@ -111,7 +112,7 @@ describe('TeacherChat', () => {
       daily_used: 1,
       remaining_today: 199,
     };
-    chatApi.sendCourseChatMessage.mockResolvedValue(reply);
+    chatApi.streamCourseChatMessage.mockResolvedValue(reply);
 
     renderChat();
     await screen.findByText('还没有提问。');
@@ -121,12 +122,14 @@ describe('TeacherChat', () => {
     await userEvent.click(screen.getByRole('button', { name: /发送/ }));
 
     await waitFor(() => {
-      expect(chatApi.sendCourseChatMessage).toHaveBeenCalledWith('course-1', {
+      expect(chatApi.streamCourseChatMessage).toHaveBeenCalledWith('course-1', {
         message: '为什么取趋近？',
         stage_id: 'stage-1',
         scene_id: 'scene-2',
         include_materials: false,
-      });
+      },
+      expect.objectContaining({ onDelta: expect.any(Function) }),
+      );
     });
     expect(
       await screen.findByText('因为极限关注的是靠近目标时的趋势。'),
@@ -138,7 +141,7 @@ describe('TeacherChat', () => {
   it('clears the draft immediately and shows the thinking state', async () => {
     chatApi.getCourseChat.mockResolvedValue(thread([]));
     let resolveSend: (value: ChatReply) => void = () => {};
-    chatApi.sendCourseChatMessage.mockReturnValue(
+    chatApi.streamCourseChatMessage.mockReturnValue(
       new Promise<ChatReply>((resolve) => {
         resolveSend = resolve;
       }),
@@ -170,6 +173,50 @@ describe('TeacherChat', () => {
     expect(await screen.findByText('THINKING-DONE')).toBeInTheDocument();
     expect(screen.queryByText('老师正在思考…')).not.toBeInTheDocument();
     expect(screen.getAllByText('先清空我')).toHaveLength(1);
+  });
+
+  it('renders streamed deltas before the reply completes', async () => {
+    chatApi.getCourseChat.mockResolvedValue(thread([]));
+    let finish: (value: ChatReply) => void = () => {};
+    let emit: (text: string) => void = () => {};
+    chatApi.streamCourseChatMessage.mockImplementation(
+      (
+        _courseId: string,
+        _payload: unknown,
+        handlers: { onDelta?: (text: string) => void },
+      ) =>
+        new Promise<ChatReply>((resolve) => {
+          finish = resolve;
+          emit = (text) => handlers.onDelta?.(text);
+        }),
+    );
+
+    renderChat();
+    const input = await screen.findByRole('textbox');
+    await userEvent.type(input, 'STREAM-PREVIEW{enter}');
+    await waitFor(() => {
+      expect(chatApi.streamCourseChatMessage).toHaveBeenCalledTimes(1);
+    });
+
+    await act(async () => {
+      emit('PARTIAL-ANSWER');
+    });
+    expect(await screen.findByText('PARTIAL-ANSWER')).toBeInTheDocument();
+
+    await act(async () => {
+      finish({
+        course_id: 'course-1',
+        session_id: 'session-1',
+        question: message({ id: 'q1', role: 'user', content: 'STREAM-PREVIEW' }),
+        reply: message({ id: 'a1', role: 'assistant', content: 'FINAL-ANSWER' }),
+        daily_limit: 200,
+        daily_used: 1,
+        remaining_today: 199,
+      });
+    });
+
+    expect(await screen.findByText('FINAL-ANSWER')).toBeInTheDocument();
+    expect(screen.queryByText('PARTIAL-ANSWER')).not.toBeInTheDocument();
   });
 
   it('renders assistant markdown instead of raw markup', async () => {
@@ -218,7 +265,7 @@ describe('TeacherChat', () => {
 
   it('sends on Enter and keeps newlines for Shift+Enter', async () => {
     chatApi.getCourseChat.mockResolvedValue(thread([]));
-    chatApi.sendCourseChatMessage.mockResolvedValue({
+    chatApi.streamCourseChatMessage.mockResolvedValue({
       course_id: 'course-1',
       session_id: 'session-1',
       question: message({ id: 'q1', role: 'user', content: '第一行' }),
@@ -235,14 +282,14 @@ describe('TeacherChat', () => {
     await userEvent.type(input, '第一行{enter}');
 
     await waitFor(() => {
-      expect(chatApi.sendCourseChatMessage).toHaveBeenCalledTimes(1);
+      expect(chatApi.streamCourseChatMessage).toHaveBeenCalledTimes(1);
     });
     expect(await screen.findByText('ENTERED')).toBeInTheDocument();
   });
 
   it('surfaces the daily limit error and keeps the draft', async () => {
     chatApi.getCourseChat.mockResolvedValue(thread([]));
-    chatApi.sendCourseChatMessage.mockRejectedValue(
+    chatApi.streamCourseChatMessage.mockRejectedValue(
       new ApiError(429, 'CHAT_DAILY_LIMIT_REACHED', 'Daily teacher question limit reached'),
     );
 

@@ -140,6 +140,17 @@ export async function apiRequest<T>(
   return (await response.text()) as T;
 }
 
+export async function apiStreamRequest(
+  path: string,
+  options: RequestOptions = {},
+): Promise<Response> {
+  const response = await performRequest(path, options);
+  if (!response.ok) {
+    throw await parseError(response);
+  }
+  return response;
+}
+
 export async function apiDownload(
   path: string,
   options: RequestOptions = {},

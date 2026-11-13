@@ -6,7 +6,11 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 import { ChatMarkdown } from '@/components/classroom/chat-markdown';
-import { clearCourseChat, getCourseChat, sendCourseChatMessage } from '@/lib/api/chat';
+import {
+  clearCourseChat,
+  getCourseChat,
+  streamCourseChatMessage,
+} from '@/lib/api/chat';
 import { ApiError } from '@/lib/api/client';
 import type { ChatMessage } from '@/lib/api/types';
 import { cn } from '@/lib/utils/cn';
@@ -92,6 +96,7 @@ export function TeacherChat({
   const [draft, setDraft] = useState('');
   const [pendingQuestion, setPendingQuestion] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
+  const [streamingAnswer, setStreamingAnswer] = useState<string | null>(null);
   const [clearing, setClearing] = useState(false);
   const [confirmingClear, setConfirmingClear] = useState(false);
   const [includeMaterials, setIncludeMaterials] = useState(false);
@@ -128,7 +133,7 @@ export function TeacherChat({
     if (element) {
       element.scrollTop = element.scrollHeight;
     }
-  }, [messages, open, pendingQuestion, sending]);
+  }, [messages, open, pendingQuestion, sending, streamingAnswer]);
 
   useEffect(() => {
     if (!open) {
@@ -159,15 +164,23 @@ export function TeacherChat({
     }
     setDraft('');
     setPendingQuestion(message);
+    setStreamingAnswer(null);
     setSending(true);
     setNotice(null);
     try {
-      const result = await sendCourseChatMessage(courseId, {
-        message,
-        stage_id: stageId ?? null,
-        scene_id: sceneId ?? null,
-        include_materials: includeMaterials,
-      });
+      const result = await streamCourseChatMessage(
+        courseId,
+        {
+          message,
+          stage_id: stageId ?? null,
+          scene_id: sceneId ?? null,
+          include_materials: includeMaterials,
+        },
+        {
+          onDelta: (text) =>
+            setStreamingAnswer((previous) => `${previous ?? ''}${text}`),
+        },
+      );
       setMessages((previous) => [...previous, result.question, result.reply]);
       setRemaining(result.remaining_today);
       setDailyLimit(result.daily_limit);
@@ -176,6 +189,7 @@ export function TeacherChat({
       setDraft(message);
     } finally {
       setPendingQuestion(null);
+      setStreamingAnswer(null);
       setSending(false);
     }
   }, [courseId, draft, includeMaterials, sceneId, sending, stageId]);
@@ -303,7 +317,16 @@ export function TeacherChat({
             </div>
           ) : null}
 
-          {sending ? (
+          {streamingAnswer !== null ? (
+            <div className='flex flex-col items-start'>
+              <div className='max-w-[92%] break-words border border-chalk/12 bg-chalk/[0.04] px-3 py-2 text-chalk/75'>
+                <ChatMarkdown content={streamingAnswer} />
+                <span className='ml-0.5 inline-block h-3 w-1 animate-pulse bg-ember align-middle' />
+              </div>
+            </div>
+          ) : null}
+
+          {sending && streamingAnswer === null ? (
             <div className='flex flex-col items-start'>
               <div className='flex items-center gap-2 border border-chalk/12 bg-chalk/[0.04] px-3 py-2 text-xs text-chalk/50'>
                 <Loader2 className='h-3.5 w-3.5 animate-spin text-ember' />
