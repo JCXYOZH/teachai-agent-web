@@ -65,6 +65,20 @@ const illustration: ClassroomIllustration = {
   alt: '神经网络的深墨绿教学插画',
 };
 
+function stubBlobUrl() {
+  const createObjectUrl = vi.fn(() => 'blob:illustration-preview');
+  const revokeObjectUrl = vi.fn();
+  Object.defineProperty(URL, 'createObjectURL', {
+    configurable: true,
+    value: createObjectUrl,
+  });
+  Object.defineProperty(URL, 'revokeObjectURL', {
+    configurable: true,
+    value: revokeObjectUrl,
+  });
+  return { createObjectUrl, revokeObjectUrl };
+}
+
 function jsonResponse(payload: unknown): Response {
   return {
     ok: true,
@@ -120,6 +134,40 @@ describe('SlideStage mobile playback', () => {
     expect(mobileBullet).toHaveClass('opacity-0');
     expect(mobileBullet).toHaveAttribute('aria-hidden', 'true');
   });
+  it('shows the quality score and flags low-quality artwork', async () => {
+    stubBlobUrl();
+    vi.mocked(downloadMediaBlob).mockResolvedValue(
+      new Blob(['image'], { type: 'image/webp' }),
+    );
+
+    render(
+      <SlideStage
+        canvas={canvas}
+        illustration={{ ...illustration, quality: { score: 34, status: 'low' } }}
+      />,
+    );
+
+    expect(await screen.findByText(/Q34/)).toBeInTheDocument();
+    expect(screen.getByText('Low quality')).toBeInTheDocument();
+  });
+
+  it('shows the score without a warning when the artwork passes', async () => {
+    stubBlobUrl();
+    vi.mocked(downloadMediaBlob).mockResolvedValue(
+      new Blob(['image'], { type: 'image/webp' }),
+    );
+
+    render(
+      <SlideStage
+        canvas={canvas}
+        illustration={{ ...illustration, quality: { score: 91, status: 'ok' } }}
+      />,
+    );
+
+    expect(await screen.findByText(/Q91/)).toBeInTheDocument();
+    expect(screen.queryByText('Low quality')).not.toBeInTheDocument();
+  });
+
 });
 
 describe('generateSceneIllustration', () => {

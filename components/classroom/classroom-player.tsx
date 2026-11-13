@@ -57,6 +57,7 @@ import type {
   ClassroomSceneContent,
   ClassroomSceneType,
   ClassroomSlideContent,
+  IllustrationGeneratePayload,
 } from '@/lib/api/types';
 import { useClassroomPlayback } from '@/lib/classroom/use-classroom-playback';
 import {
@@ -368,10 +369,20 @@ function NarrationPanel({
   );
 }
 
-function IllustrationPanel({
+const ILLUSTRATION_PROVIDERS = [
+  { value: '', label: 'Auto · Qwen → fallback' },
+  { value: 'qwen', label: 'Qwen' },
+  { value: 'pollinations', label: 'Pollinations (free)' },
+  { value: 'huggingface', label: 'HuggingFace' },
+  { value: 'cloudflare', label: 'Cloudflare' },
+];
+
+export function IllustrationPanel({
   illustration,
   busy,
   progress,
+  provider,
+  onProviderChange,
   onGenerateScene,
   onGenerateAll,
   className,
@@ -379,6 +390,8 @@ function IllustrationPanel({
   illustration?: ClassroomIllustration | null;
   busy: boolean;
   progress: { message: string; progress: number } | null;
+  provider: string;
+  onProviderChange: (value: string) => void;
   onGenerateScene: () => void;
   onGenerateAll: () => void;
   className?: string;
@@ -413,8 +426,56 @@ function IllustrationPanel({
               ? `${illustration?.providerId ?? 'provider'} · ${illustration?.width ?? 0}×${illustration?.height ?? 0}`
               : 'Qwen Image · Pollinations fallback'}
           </p>
+          {ready && illustration?.quality ? (
+            <p
+              className={cn(
+                'mt-1 font-mono text-[0.44rem] uppercase tracking-[0.12em]',
+                illustration.quality.status === 'low'
+                  ? 'text-ember/80'
+                  : 'text-sage/70',
+              )}
+            >
+              Quality {illustration.quality.score}/100
+            </p>
+          ) : null}
+          {ready && illustration?.quality?.status === 'low' ? (
+            <div className='mt-2'>
+              <p className='text-[0.7rem] leading-5 text-ember/75'>
+                本页配图质量偏低，建议重新生成。
+              </p>
+              {(illustration?.quality?.vlm?.issues?.length ?? 0) > 0 ? (
+                <ul className='mt-1 list-disc space-y-0.5 pl-4 text-[0.68rem] leading-5 text-ember/60'>
+                  {(illustration?.quality?.vlm?.issues ?? []).slice(0, 3).map((issue, index) => (
+                    <li key={`${index}-${issue}`}>{issue}</li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       </div>
+
+      <label className='mt-4 flex items-center gap-2 font-mono text-[0.5rem] uppercase tracking-[0.12em] text-chalk/40'>
+        Provider
+        <select
+          aria-label='Illustration provider'
+          value={provider}
+          disabled={busy}
+          onChange={(event) => onProviderChange(event.target.value)}
+          className='h-7 flex-1 border border-chalk/15 bg-classroom px-2 text-[0.55rem] text-chalk/70 focus:border-ember/40 focus:outline-none'
+        >
+          {ILLUSTRATION_PROVIDERS.map((option) => (
+            <option key={option.value || 'auto'} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      {provider === 'huggingface' || provider === 'cloudflare' ? (
+        <p className='mt-1 font-mono text-[0.44rem] uppercase tracking-[0.12em] text-chalk/30'>
+          需服务端已配置对应 Token，否则任务会失败
+        </p>
+      ) : null}
 
       <div className='mt-4 flex flex-wrap items-center gap-2'>
         <button
@@ -468,6 +529,7 @@ export function ClassroomPlayer({ classroom }: { classroom: Classroom }) {
     message: string;
     progress: number;
   } | null>(null);
+  const [illustrationProvider, setIllustrationProvider] = useState('');
   const [illustrationProgress, setIllustrationProgress] = useState<{
     message: string;
     progress: number;
@@ -558,14 +620,20 @@ export function ClassroomPlayer({ classroom }: { classroom: Classroom }) {
         targetScene && isSlideContent(targetScene.content)
           ? targetScene.content.illustration
           : null;
-      const payload = targetIllustration ? { regenerate: true } : {};
+      const payload: IllustrationGeneratePayload = {
+        ...(targetIllustration ? { regenerate: true } : {}),
+        ...(illustrationProvider ? { provider_id: illustrationProvider } : {}),
+      };
       const job = sceneId
         ? await generateSceneIllustration(
             classroom.course_id,
             sceneId,
             payload,
           )
-        : await generateClassroomIllustrations(classroom.course_id);
+        : await generateClassroomIllustrations(
+            classroom.course_id,
+            payload,
+          );
       return waitForGenerationJob(job.id, {
         signal: controller.signal,
         onProgress: (update) =>
@@ -968,6 +1036,8 @@ export function ClassroomPlayer({ classroom }: { classroom: Classroom }) {
             illustration={currentIllustration}
             busy={illustrationMutation.isLoading}
             progress={illustrationProgress}
+            provider={illustrationProvider}
+            onProviderChange={setIllustrationProvider}
             onGenerateScene={() => illustrationMutation.mutate(scene.id)}
             onGenerateAll={() => illustrationMutation.mutate(undefined)}
           />

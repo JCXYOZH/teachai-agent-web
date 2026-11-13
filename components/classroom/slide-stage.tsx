@@ -16,6 +16,11 @@ import {
 import { useFitScale } from '@/lib/classroom/use-fit-scale';
 import { cn } from '@/lib/utils/cn';
 
+function qualityLabel(illustration?: ClassroomIllustration | null): string {
+  const score = illustration?.quality?.score;
+  return typeof score === 'number' ? ` · Q${Math.round(score)}` : '';
+}
+
 function useIllustrationUrl(illustration?: ClassroomIllustration | null) {
   const [url, setUrl] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
@@ -117,9 +122,14 @@ export function SlideStage({
               <div className='pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(7,17,14,0.04),transparent_50%,rgba(7,17,14,0.72))]' />
               <figcaption className='absolute bottom-2 right-3 font-mono text-[0.42rem] uppercase tracking-[0.14em] text-chalk/45'>
                 {artwork.url && illustration.providerId
-                  ? `${illustration.providerId} · ${illustration.width}×${illustration.height}`
+                  ? `${illustration.providerId} · ${illustration.width}×${illustration.height}${qualityLabel(illustration)}`
                   : 'Illustrating'}
               </figcaption>
+              {illustration.quality?.status === 'low' ? (
+                <span className='pointer-events-none absolute left-3 top-3 border border-ember/50 bg-ember/15 px-2 py-0.5 font-mono text-[0.42rem] uppercase tracking-[0.14em] text-ember'>
+                  Low quality
+                </span>
+              ) : null}
             </figure>
           ) : null}
           {mobileBullets.length > 0 ? (

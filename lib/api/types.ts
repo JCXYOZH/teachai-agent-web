@@ -249,6 +249,18 @@ export interface ClassroomSlideCanvas {
   script?: string;
 }
 
+export interface ClassroomIllustrationQuality {
+  score: number;
+  status: 'ok' | 'low';
+  reasons?: string[];
+  metrics?: Record<string, number>;
+  vlm?: {
+    score: number;
+    issues?: string[];
+    model?: string | null;
+  } | null;
+}
+
 export interface ClassroomIllustration {
   mediaId: string;
   format: string;
@@ -260,6 +272,7 @@ export interface ClassroomIllustration {
   sha256: string;
   updatedAt: string | null;
   alt: string | null;
+  quality?: ClassroomIllustrationQuality | null;
 }
 
 export interface ClassroomSlideContent {
