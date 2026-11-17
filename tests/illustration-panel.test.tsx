@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
-import { IllustrationPanel } from '@/components/classroom/classroom-player';
+import { IllustrationPanel } from '@/components/classroom/illustration-panel';
 import type { ClassroomIllustration } from '@/lib/api/types';
 
 const illustration: ClassroomIllustration = {
