@@ -233,7 +233,6 @@ export default function CreatePage() {
       </section>
 
       <div className='mt-6 flex flex-col justify-between gap-4 border border-dashed border-ink/15 px-5 py-4 text-xs text-ink/45 sm:flex-row sm:items-center'>
-        <p>阶段 2 已接通课程草稿、文件夹、素材管理与中文检索。</p>
         <Link href='/library' className={cn('inline-flex items-center gap-2 font-mono text-[0.6rem] uppercase tracking-[0.14em] text-ink/50 hover:text-ember')}>
           <ArrowLeft className='h-3.5 w-3.5' />
           回到课程档案

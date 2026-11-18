@@ -11,7 +11,7 @@ export function KnowledgeAside() {
       <div className='border border-ink/10 bg-paper/35 p-5'>
         <p className='eyebrow'>Retrieval / 检索</p>
         <p className='mt-3 text-sm leading-6 text-ink/55'>
-          中文内容使用 PostgreSQL 关键词与模糊匹配；当前环境未安装 pg_trgm，因此不做向量检索。
+          中文内容使用 PostgreSQL 关键词与模糊匹配
         </p>
         <div className='mt-5 flex flex-wrap gap-2'>
           <Badge>FULL TEXT</Badge>
@@ -24,7 +24,7 @@ export function KnowledgeAside() {
         <ul className='mt-4 space-y-3 text-xs text-ink/45'>
           <li className='flex items-center gap-2.5'>
             <HardDrive className='h-3.5 w-3.5 text-ink/30' />
-            本地磁盘 · E:\Backups\Data\TeachAIAgent
+            资产本地磁盘进行保存
           </li>
           <li className='flex items-center gap-2.5'>
             <Database className='h-3.5 w-3.5 text-ink/30' />

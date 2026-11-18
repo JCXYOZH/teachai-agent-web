@@ -103,7 +103,7 @@ export function AuthFormFields({
             id='display_name'
             type='text'
             autoComplete='name'
-            placeholder='例如：林老师'
+            placeholder='例如：林老师 / 张学生'
             invalid={Boolean(errors.display_name)}
             aria-describedby={errors.display_name ? 'display-name-error' : undefined}
             {...register('display_name')}
