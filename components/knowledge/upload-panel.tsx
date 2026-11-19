@@ -4,6 +4,8 @@ import { Loader2, UploadCloud } from 'lucide-react';
 import type { DragEvent, RefObject } from 'react';
 
 import { ACCEPTED_UPLOAD_TYPES } from '@/lib/api/library';
+import { MAX_UPLOAD_BYTES } from '@/lib/utils/asset-files';
+import { formatBytes } from '@/lib/utils/format';
 import type { Course, Folder } from '@/lib/api/types';
 import { cn } from '@/lib/utils/cn';
 
@@ -132,7 +134,7 @@ export function UploadPanel({
         }}
       />
       <p className='relative mt-3 text-[0.65rem] leading-5 text-chalk/30'>
-        上传即解析，单个文件上限 50 MB。文件写入本地磁盘，下载必须经过鉴权。
+        上传即解析，单个文件上限 {formatBytes(MAX_UPLOAD_BYTES)}。文件写入本地磁盘，下载必须经过鉴权。
       </p>
     </div>
   );

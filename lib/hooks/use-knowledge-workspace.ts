@@ -15,8 +15,17 @@ import {
 } from '@/lib/api/library';
 import type { Asset } from '@/lib/api/types';
 import { useDebouncedValue } from '@/lib/hooks/use-debounced-value';
-import { isSupportedFile } from '@/lib/utils/asset-files';
+import { ApiError } from '@/lib/api/client';
+import { MAX_UPLOAD_BYTES, isOversizedFile, isSupportedFile } from '@/lib/utils/asset-files';
 import { errorMessage } from '@/lib/utils/errors';
+import { formatBytes } from '@/lib/utils/format';
+
+function uploadErrorReason(error: unknown): string {
+  if (error instanceof ApiError && error.code === 'FILE_TOO_LARGE') {
+    return `超过 ${formatBytes(MAX_UPLOAD_BYTES)} 上限`;
+  }
+  return errorMessage(error, '上传失败，请检查文件类型与大小');
+}
 
 export function useKnowledgeWorkspace() {
   const queryClient = useQueryClient();
@@ -64,14 +73,31 @@ export function useKnowledgeWorkspace() {
 
   const uploadMutation = useMutation({
     mutationFn: async (files: File[]) => {
+      const failed: { name: string; error: unknown }[] = [];
+      let uploaded = 0;
       for (const file of files) {
-        await uploadAsset(file, uploadCourse || undefined, uploadFolder || undefined);
+        try {
+          await uploadAsset(file, uploadCourse || undefined, uploadFolder || undefined);
+          uploaded += 1;
+        } catch (error) {
+          failed.push({ name: file.name, error });
+        }
       }
-      return files.length;
+      return { uploaded, failed };
     },
-    onSuccess: async (count) => {
+    onSuccess: async ({ uploaded, failed }) => {
       await invalidateLibrary();
-      toast.success(`${count} 份素材已解析并加入书架`);
+      if (failed.length === 0) {
+        toast.success(`${uploaded} 份素材已解析并加入书架`);
+        return;
+      }
+      const names = failed.map((item) => item.name).join('、');
+      const reason = uploadErrorReason(failed[0].error);
+      toast.error(
+        uploaded === 0
+          ? `${names}：${reason}`
+          : `${uploaded} 份已加入书架，${failed.length} 份失败（${names}）：${reason}`,
+      );
     },
     onError: async (error) => {
       await invalidateLibrary();
@@ -96,15 +122,35 @@ export function useKnowledgeWorkspace() {
 
   const handleFiles = (incoming: FileList | File[]) => {
     const files = Array.from(incoming);
-    const supported = files.filter(isSupportedFile);
-    if (supported.length !== files.length) {
-      toast.error('仅支持 PDF、DOCX、PPTX、Markdown 与 TXT');
-    }
-    if (supported.length > 0) {
-      uploadMutation.mutate(supported);
-    }
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
+    }
+    if (files.length === 0) {
+      return;
+    }
+    if (uploadMutation.isLoading) {
+      toast('正在上传上一批素材，请稍候再添加');
+      return;
+    }
+
+    if (files.some((file) => !isSupportedFile(file))) {
+      toast.error('仅支持 PDF、DOCX、PPTX、Markdown 与 TXT');
+    }
+
+    const candidates = files.filter(isSupportedFile);
+    const oversized = candidates.filter(isOversizedFile);
+    const uploadable = candidates.filter((file) => !isOversizedFile(file));
+    if (oversized.length === 1) {
+      const [file] = oversized;
+      toast.error(
+        `${file.name} 为 ${formatBytes(file.size)}，超过 ${formatBytes(MAX_UPLOAD_BYTES)} 上限`,
+      );
+    } else if (oversized.length > 1) {
+      toast.error(`${oversized.length} 份文件超过 ${formatBytes(MAX_UPLOAD_BYTES)} 上限，未上传`);
+    }
+
+    if (uploadable.length > 0) {
+      uploadMutation.mutate(uploadable);
     }
   };
 

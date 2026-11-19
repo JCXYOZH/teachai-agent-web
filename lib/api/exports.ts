@@ -1,4 +1,5 @@
 import { apiDownload, apiRequest } from '@/lib/api/client';
+import { saveBlobAsFile } from '@/lib/utils/download';
 import type {
   ClassroomExport,
   ClassroomExportPayload,
@@ -28,12 +29,5 @@ export async function downloadClassroomExport(
   item: ClassroomExport,
 ): Promise<void> {
   const blob = await apiDownload(`/media/${item.media_id}/content`);
-  const objectUrl = URL.createObjectURL(blob);
-  const anchor = document.createElement('a');
-  anchor.href = objectUrl;
-  anchor.download = item.filename;
-  document.body.appendChild(anchor);
-  anchor.click();
-  anchor.remove();
-  URL.revokeObjectURL(objectUrl);
+  saveBlobAsFile(blob, item.filename);
 }

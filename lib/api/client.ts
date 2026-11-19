@@ -27,7 +27,7 @@ export class ApiError extends Error {
 
 export class ApiNetworkError extends Error {
   constructor() {
-    super('无法连接课程服务，请确认后端已启动');
+    super('网络连接中断，请检查网络后重试');
     this.name = 'ApiNetworkError';
   }
 }
@@ -56,8 +56,17 @@ export function getCookie(name: string): string | null {
     .split(';')
     .map((part) => part.trim())
     .find((part) => part.startsWith(prefix));
+  if (!match) {
+    return null;
+  }
 
-  return match ? decodeURIComponent(match.slice(prefix.length)) : null;
+  const value = match.slice(prefix.length);
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    // A malformed percent escape must not break the whole request pipeline.
+    return value;
+  }
 }
 
 export function hasSessionHint(): boolean {

@@ -2,6 +2,9 @@ node_modules
 .next
 .npm-cache
 coverage
+tests
+vitest.config.ts
+README.md
 .idea
 .vscode
 .git

@@ -1,4 +1,5 @@
 import { apiDownload, apiRequest } from '@/lib/api/client';
+import { saveBlobAsFile } from '@/lib/utils/download';
 import type {
   Asset,
   AssetDetail,
@@ -128,14 +129,7 @@ export function searchLibrary(q: string, limit = 8): Promise<SearchResponse> {
 
 export async function downloadAsset(asset: Asset): Promise<void> {
   const blob = await apiDownload(`/assets/${asset.id}/download`);
-  const objectUrl = URL.createObjectURL(blob);
-  const anchor = document.createElement('a');
-  anchor.href = objectUrl;
-  anchor.download = asset.filename;
-  document.body.appendChild(anchor);
-  anchor.click();
-  anchor.remove();
-  URL.revokeObjectURL(objectUrl);
+  saveBlobAsFile(blob, asset.filename);
 }
 
 export const ACCEPTED_UPLOAD_TYPES = '.pdf,.docx,.pptx,.md,.markdown,.txt';
