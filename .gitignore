@@ -4,6 +4,7 @@ out/
 coverage/
 .npm-cache/
 .idea/
+copyright/
 .env
 .env.local
 .env.*.local

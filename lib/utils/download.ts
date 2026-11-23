@@ -7,7 +7,7 @@ export function saveBlobAsFile(blob: Blob, filename: string): void {
   document.body.appendChild(anchor);
   anchor.click();
   anchor.remove();
-  // Revoking in the same tick aborts the download in Firefox and Safari, so
-  // give the browser a moment to start reading the blob before releasing it.
+  // 在同一事件循环内立即释放会导致 Firefox 和 Safari 中断下载，
+  // 因此先留出时间让浏览器开始读取 Blob，再释放对象 URL。
   setTimeout(() => URL.revokeObjectURL(objectUrl), 10_000);
 }

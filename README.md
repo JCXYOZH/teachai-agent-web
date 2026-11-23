@@ -2,11 +2,65 @@
 
 TeachAIAgent 的前端工作台：上传素材、生成大纲与课堂、沉浸式播放、向教师提问、导出课件。
 
+**演示站点**：[ai.offer.us.ci](https://ai.offer.us.ci) · **前端仓库**：[teachai-agent-web](https://github.com/JCXYOZH/teachai-agent-web) · **后端仓库**：[teachai-agent-api](https://github.com/JCXYOZH/teachai-agent-api)
+
 ## 项目简介
 
 TeachAIAgent 是面向教师与自学者的 AI 备课与授课工作台。用户在前端上传课件与教案，后端解析后生成课程大纲、课堂讲稿与配图，前端把课堂渲染成可播放、可答题、可导出的沉浸式页面。
 
-本仓库是前端，基于 Next.js App Router 的单页工作台：登录与注册、课程与素材管理、模型设置、沉浸式课堂播放器、教师对话与导出。后端见 `teachai-agent-api` 仓库。
+本仓库是前端，基于 Next.js App Router 的单页工作台：登录与注册、课程与素材管理、模型设置、沉浸式课堂播放器、教师对话与导出。后端见 [teachai-agent-api](https://github.com/JCXYOZH/teachai-agent-api) 仓库。
+
+## 界面预览
+
+> 演示站点：<https://ai.offer.us.ci>。以下截图取自实际运行环境，顺序与教师备课到授课的流程一致。
+
+### 登录与注册
+
+![登录与注册](shots/01_login.png)
+
+左侧是课堂预演画面，右侧登录支持手机号或邮箱；注册默认手机号验证码，底部小字可切换到邮箱注册，两种账号都能登录。
+
+### 课程档案
+
+![课程档案](shots/02_library.png)
+
+备课桌入口、最近课程书架与深色课堂预演并列，可新建课程、建文件夹，或直接进入已有课堂。
+
+### 准备新课程
+
+![准备新课程](shots/03_create.png)
+
+从一句话起稿：填写讲什么、要解决什么、归入哪个文件夹；创建后立刻进入课程档案，继续补素材与大纲。
+
+### 素材与知识
+
+![素材与知识](shots/04_knowledge.png)
+
+拖拽投递 PDF、DOCX、PPTX、MD、TXT 后即时解析，列表显示解析状态、归属与体积，支持中文检索与鉴权下载。
+
+### 模型接入
+
+![模型接入](shots/05_settings.png)
+
+七个 Provider 分别保存 Base URL、密钥与默认模型；密钥只显示末四位，只有勾选「使用当前模型」并保存后才会切换生成模型。
+
+### 沉浸式课堂与旁白
+
+![沉浸式课堂与旁白](shots/06_classroom.png)
+
+左侧场景栏、中间 1280×720 画布、右侧旁白面板：可播放动作流、切换场景、生成语音旁白。
+
+### 配图侧栏
+
+![配图侧栏](shots/07_quiz.png)
+
+在课堂内为当前幻灯片生成教学配图，也可一次补齐整堂缺图；Provider 支持自动顺序与免费兜底。
+
+### 问老师
+
+![问老师](shots/08_chat.png)
+
+教师面板依据课程大纲与当前场景作答，逐字流式返回并渲染 Markdown，输入上限 2000 字且实时计数。
 
 ## 核心功能
 
@@ -45,6 +99,31 @@ TeachAIAgent 是面向教师与自学者的 AI 备课与授课工作台。用户
 | react-hook-form | 7.51.5 |
 | Zod | 3.23.8 |
 | Vitest | 0.34.6 |
+
+## 项目结构
+
+```text
+teachai-agent-web/
+├── app/                          # App Router 路由
+│   ├── (app)/                    # 工作台壳：library / create / knowledge / settings
+│   ├── classroom/[courseId]/     # 全屏沉浸课堂
+│   ├── login/                    # 登录与注册
+│   └── fonts/                    # 本地化字体，构建期不访问外网
+├── components/                   # auth / library / knowledge / classroom / providers / layout / ui
+├── lib/
+│   ├── api/                      # 类型化 API 客户端与各领域请求
+│   ├── classroom/                # DSL 类型、HTML 清洗与移动端重排
+│   ├── hooks/                    # 会话、工作台与生成任务 hooks
+│   ├── stores/                   # Zustand 状态
+│   ├── utils/                    # 格式化、下载、上传限制等工具
+│   └── validators/               # Zod 校验
+├── public/                       # 静态资源
+├── shots/                        # 界面截图
+├── tests/                        # Vitest 用例
+├── docker-compose.prod.yml       # 生产编排
+├── Dockerfile
+└── next.config.mjs               # standalone 输出
+```
 
 ## 启动
 
@@ -93,7 +172,7 @@ npm run dev
 - 不勾选只保存配置，不影响正在使用的模型。
 - 连接测试会真实发送一次最小生成请求，并显示实际返回模型、延迟与发现的模型列表。
 
-Qwen 可直接使用 DashScope 地址或自建 MaaS 兼容地址；`qwen3.8-omni-flash` 会以纯文本模态测试。配置格式与后端安全约束见 `teachai-agent-api/docs/providers.md`。
+Qwen 可直接使用 DashScope 地址或自建 MaaS 兼容地址；`qwen3.8-omni-flash` 会以纯文本模态测试。配置格式与后端安全约束见 [docs/providers.md](https://github.com/JCXYOZH/teachai-agent-api/blob/master/docs/providers.md)。
 
 ## 课堂播放器
 
@@ -144,4 +223,10 @@ docker compose -f docker-compose.prod.yml up -d --build
 - 生产 compose 使用 `network_mode: host`，前端直接监听 `49153`，不创建 bridge 网络、不做端口映射。
 - 字体已本地化到 `app/fonts`，`app/layout.tsx` 使用 `next/font/local`，构建过程不访问外网字体服务。
 
-后端、Nginx、frp 与数据库的完整流程见 `teachai-agent-api/docs/deployment.md`。
+后端、Nginx、frp 与数据库的完整流程见 [docs/deployment.md](https://github.com/JCXYOZH/teachai-agent-api/blob/master/docs/deployment.md)。
+
+## 许可证
+
+本项目采用 [GNU General Public License v3.0](LICENSE)（GPL-3.0）开源：可以自由使用、修改与再分发，衍生的作品必须以相同许可证公开完整源码，并保留版权声明与许可证副本。
+
+完整条款见仓库根目录的 [LICENSE](LICENSE)，或 <https://www.gnu.org/licenses/gpl-3.0.html>。

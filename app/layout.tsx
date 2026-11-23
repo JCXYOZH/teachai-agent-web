@@ -10,7 +10,7 @@ import 'katex/dist/katex.min.css';
 
 import './globals.css';
 
-// Fonts are vendored under app/fonts so production builds never reach the network.
+// 字体文件放在 app/fonts 下随仓库分发，生产构建过程无需访问外网。
 const displayFont = localFont({
   src: [
     { path: './fonts/LibreBaskerville-normal.woff2', weight: '400 700', style: 'normal' },

@@ -25,9 +25,9 @@ function buildHead(): string {
 }
 
 /**
- * Wraps model-authored widget HTML so it always runs isolated and offline:
- * a strict CSP blocks every network channel, and the frame is mounted with a
- * sandbox that grants scripts but never same-origin access to the host page.
+ * 包装模型生成的交互组件 HTML，使其始终在隔离、离线的环境中运行：
+ * 严格 CSP 阻断全部网络通道，iframe 以 sandbox 挂载，允许执行脚本
+ * 但不授予同源权限，无法访问宿主页面。
  */
 export function buildInteractiveDocument(html: string): string {
   const head = buildHead();

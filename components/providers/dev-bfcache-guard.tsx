@@ -7,7 +7,7 @@ export function DevBfcacheGuard() {
     if (process.env.NODE_ENV !== 'development') {
       return undefined;
     }
-    // Chrome freezes the Next.js HMR WebSocket with the page in BFCache.
+    // 页面进入 BFCache 后 Chrome 会冻结 Next.js 的热更新 WebSocket。
     const handlePageShow = (event: PageTransitionEvent) => {
       if (event.persisted) {
         window.location.reload();

@@ -64,7 +64,7 @@ export function getCookie(name: string): string | null {
   try {
     return decodeURIComponent(value);
   } catch {
-    // A malformed percent escape must not break the whole request pipeline.
+    // 非法的百分号转义不应中断整个请求流程。
     return value;
   }
 }
@@ -120,7 +120,7 @@ async function parseError(response: Response): Promise<ApiError> {
       return new ApiError(response.status, error.code, error.message, error.details);
     }
   } catch {
-    // The response was not JSON; fall through to a generic error.
+    // 响应不是 JSON，退化为通用错误处理。
   }
   return new ApiError(
     response.status,

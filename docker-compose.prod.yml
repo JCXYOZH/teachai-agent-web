@@ -1,14 +1,14 @@
-# Production stack for the TeachAI Agent web app.
-# Host Nginx terminates TLS and proxies to 127.0.0.1:49153.
+# TeachAI Agent Web 前端生产编排。
+# 宿主机 Nginx 终止 TLS，反向代理到 127.0.0.1:49153。
 services:
   web:
     build:
       context: .
       dockerfile: Dockerfile
-      # The server's default bridge DNS cannot resolve registry.npmjs.org.
+      # 服务器默认的 bridge 网络无法解析 registry.npmjs.org。
       network: host
       args:
-        # Same-origin deployment: Nginx serves the API under the same host.
+        # 同源部署：Nginx 在同一域名下提供 API。
         NEXT_PUBLIC_API_BASE_URL: /api/v1
     image: teachai-agent-web:latest
     restart: unless-stopped
@@ -16,8 +16,7 @@ services:
       NODE_ENV: production
       PORT: "49153"
       HOSTNAME: 0.0.0.0
-    # Host networking: this server's bridge network is broken (no container DNS,
-    # missing DOCKER iptables chain), and Nginx only needs 127.0.0.1:49153.
+    # 使用 host 网络：服务器 bridge 网络不可用（容器内无法解析 DNS、缺少 DOCKER iptables 链），而 Nginx 只需访问 127.0.0.1:49153。
     network_mode: host
     security_opt:
       - no-new-privileges:true
