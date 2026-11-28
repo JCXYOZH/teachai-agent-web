@@ -5,6 +5,7 @@ import { Mail, MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import type { AuthFormState } from '@/lib/hooks/use-auth-form';
+import { cooldownLabel } from '@/lib/utils/auth-errors';
 import type { Mode } from '@/lib/validators/auth-form';
 
 export function AuthFormFields({
@@ -178,7 +179,7 @@ export function AuthFormFields({
               {sendingCode
                 ? '发送中…'
                 : seconds > 0
-                  ? `${seconds} 秒后重发`
+                  ? cooldownLabel(seconds)
                   : sentTarget
                     ? '重新发送'
                     : '发送验证码'}

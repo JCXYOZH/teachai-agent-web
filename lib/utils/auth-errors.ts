@@ -14,6 +14,7 @@ export function messageForError(error: unknown): string {
       VERIFICATION_CODE_EXPIRED: '验证码已过期，请重新发送。',
       INVALID_VERIFICATION_CODE: '验证码不正确，请检查后重试。',
       SMS_SEND_RATE_LIMITED: '发送太频繁，请稍后再试。',
+      EMAIL_SEND_RATE_LIMITED: '发送太频繁，请稍后再试。',
       VERIFICATION_ATTEMPTS_EXCEEDED: '尝试次数过多，请重新发送验证码。',
       VERIFICATION_RESEND_TOO_SOON: '发送太频繁，请稍后再试。',
       EMAIL_DELIVERY_UNAVAILABLE: '验证邮件暂时无法发送，请稍后再试。',
@@ -36,4 +37,11 @@ export function retryAfterSeconds(details: unknown): number {
     }
   }
   return 60;
+}
+
+export function cooldownLabel(seconds: number): string {
+  if (seconds > 60) {
+    return `${Math.ceil(seconds / 60)} 分钟后重发`;
+  }
+  return `${seconds} 秒后重发`;
 }

@@ -288,6 +288,42 @@ describe('LoginForm', () => {
     expect(screen.getByRole('button', { name: '55 秒后重发' })).toBeDisabled();
   });
 
+  it('starts the resend cooldown when the email send limit is hit', async () => {
+    authMocks.sendRegistrationCode.mockRejectedValue(
+      new ApiError(429, 'EMAIL_SEND_RATE_LIMITED', 'Too many verification email requests', {
+        retry_after: 55,
+      }),
+    );
+    const user = userEvent.setup();
+    render(<LoginForm />);
+
+    await user.click(screen.getByRole('tab', { name: '创建账号' }));
+    await user.click(screen.getByRole('button', { name: '使用邮箱注册' }));
+    await user.type(screen.getByLabelText('邮箱'), 'teacher@example.com');
+    await user.click(screen.getByRole('button', { name: '发送验证码' }));
+
+    expect(await screen.findByText(/发送太频繁/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '55 秒后重发' })).toBeDisabled();
+  });
+
+  it('shows the cooldown in minutes when the hourly email limit is hit', async () => {
+    authMocks.sendRegistrationCode.mockRejectedValue(
+      new ApiError(429, 'EMAIL_SEND_RATE_LIMITED', 'Too many verification email requests', {
+        retry_after: 3600,
+      }),
+    );
+    const user = userEvent.setup();
+    render(<LoginForm />);
+
+    await user.click(screen.getByRole('tab', { name: '创建账号' }));
+    await user.click(screen.getByRole('button', { name: '使用邮箱注册' }));
+    await user.type(screen.getByLabelText('邮箱'), 'teacher@example.com');
+    await user.click(screen.getByRole('button', { name: '发送验证码' }));
+
+    expect(await screen.findByText(/发送太频繁/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '60 分钟后重发' })).toBeDisabled();
+  });
+
   it('keeps the form open when the phone code is rejected', async () => {
     authMocks.sendRegistrationCode.mockResolvedValue(phoneCodeResponse);
     authMocks.registerUser.mockRejectedValue(

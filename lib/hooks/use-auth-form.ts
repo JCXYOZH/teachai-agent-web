@@ -23,6 +23,12 @@ import {
   type Mode,
 } from '@/lib/validators/auth-form';
 
+const COOLDOWN_ERROR_CODES = new Set([
+  'VERIFICATION_RESEND_TOO_SOON',
+  'SMS_SEND_RATE_LIMITED',
+  'EMAIL_SEND_RATE_LIMITED',
+]);
+
 export function useAuthForm({
   mode,
   destination,
@@ -126,11 +132,7 @@ export function useAuthForm({
         activeChannel === 'phone' ? '验证码已发送，请查收短信' : '验证码已发送，请查收邮箱',
       );
     } catch (error) {
-      if (
-        error instanceof ApiError &&
-        (error.code === 'VERIFICATION_RESEND_TOO_SOON' ||
-          error.code === 'SMS_SEND_RATE_LIMITED')
-      ) {
+      if (error instanceof ApiError && COOLDOWN_ERROR_CODES.has(error.code)) {
         setSentTarget(normalizeContact(activeChannel, contact));
         setSeconds(retryAfterSeconds(error.details));
       }
